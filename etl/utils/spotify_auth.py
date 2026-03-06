@@ -27,7 +27,7 @@ def get_spotify_access_token ():
         print(f"Connection error: {e}")
     except ValueError:
         print("Invalid JSON response")
-        return None
+    return None
 
 
 #return access_token
