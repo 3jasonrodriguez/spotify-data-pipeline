@@ -28,31 +28,43 @@ def spotify_searches(search_list, search_type, limit):
                 'type':search_type, 
                 'limit':limit
         } 
-        #grab search result with exception handling
-        search_response = requests.get(search_url, headers=headers, params=payload, timeout=10)
+
         #grab immediate errors thrown
         try:
+            #grab search result with exception handling
+            search_response = requests.get(search_url, headers=headers, params=payload, timeout=10)
             search_response.raise_for_status()
+            data = search_response.json()
+
         except HTTPError as e:
             print(f"HTTP Error: {e}")
             continue
         except RequestException as e:
             print(f"Request failed: {e}")
             continue
-        #Eror handling for JSON parsing
-        try:
-            data = search_response.json()
+        #JSON parsing errors
         except (ValueError, KeyError) as e:
             print(f"Failed to parse JSON for query '{query}': {e}")
             continue
+
         print(f"result for {query}")
-        #Grab "items" within a search results for each result
+        #Grab items within a search result, even if the search types and items keys are missing
         items = data.get(type_map[search_type], {}).get("items", [])
-        print(f"Query: {query} -> {len(items)} results")
+        #strip the quotes before looking for names and descriptions
+        clean_query = query.lower()
+        #Looks for matches containing the query (Spotify is looking for the query string in the name and description)
+        cleansed_items = [
+            p for p in items
+            if p and (
+                clean_query in p.get("name", "").lower() or
+                clean_query in p.get("description", "").lower()
+            )
+        ]        
+        print(f"Query: {query} -> {len(cleansed_items)} results")
         #Append items to collected list
-        all_results.extend(items)
-    # Deduped search results
-    unique_results = {p["id"]: p for p in all_results if p.get("id")}    
+        all_results.extend(cleansed_items)
+    # Deduped search results by creating a dictionary keyed by id.
+    unique_results = {result["id"]: result for result in all_results if result and result.get("id")}
     print(f"Total results: {len(all_results)}")
     print(f"Unique results: {len(unique_results)}")
     print(list(unique_results.values()))
@@ -63,6 +75,6 @@ def spotify_searches(search_list, search_type, limit):
 #Define main for reusability and importing
 def main():
     genre_list = ["prog rock", "progressive rock", "math rock"]
-    searches = spotify_searches(genre_list, "playlist", 2)
+    searches = spotify_searches(genre_list, "playlist", 10)
 if __name__ == "__main__":
     main()
