@@ -41,27 +41,3 @@ def exchange_code_for_tokens(code):
     except ValueError:
         print("Invalid JSON response")
     return None
-
-
-def get_spotify_access_token ():
-
-    #load variables from .env file
-    load_dotenv()
-    auth_url = "https://accounts.spotify.com/api/token"
-    payload = {
-        'grant_type': 'refresh_token',
-        'refresh_token':os.getenv("SPOTIFY_REFRESH_TOKEN"),
-    }
-        #Try catch for grabbing an access token with exception handling
-    try:
-        token_response = requests.post(auth_url, data=payload, auth=(os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET")))
-        data = token_response.json()
-        access_token = data['access_token']
-        return access_token
-    except HTTPError as e:
-        print(f"HTTP error: {e.token_response['status_code']}")
-    except RequestException as e:
-        print(f"Connection error: {e}")
-    except ValueError:
-        print("Invalid JSON response")
-    return None

@@ -10,7 +10,6 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
 
 def get_playlist_tracks():
-    #token = get_spotify_access_token()
     load_dotenv()
     #Using creds to for s3 client connect
     client = boto3.client(
@@ -61,10 +60,35 @@ def get_playlist_tracks():
     playlists = [json.loads(line) for line in playlists_contents.strip().splitlines() if line]
     #Grab playlist ids
     playlist_ids = [p["id"] for p in playlists if p and p.get("id")]
+    #Get access token
+    token = get_spotify_access_token()
     #For each playlist, grab the tracks
     for id in playlist_ids:
         items_url = f"https://api.spotify.com/v1/playlists/{id}/items"
-        print(items_url)
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json" # Optional: specify expected response format
+        }
+        payload = {
+            'limit':50,
+            'market':'US'
+        } 
+        try:
+            #grab search result with exception handling
+            items_response = requests.get(items_url, headers=headers, params=payload, timeout=10)
+            items_response.raise_for_status()
+            data = items_response.json()
+        except HTTPError as e:
+            print(f"HTTP Error: {e}")
+            continue
+        except RequestException as e:
+            print(f"Request failed: {e}")
+            continue
+        #JSON parsing errors
+        except (ValueError, KeyError) as e:
+            print(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
+            continue
+        print(data)
     
 def main():
     playlist_tracks = get_playlist_tracks()
