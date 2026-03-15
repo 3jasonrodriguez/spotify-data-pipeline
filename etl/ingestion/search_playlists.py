@@ -67,7 +67,6 @@ def spotify_searches(search_list, search_type, limit):
     unique_results = {result["id"]: result for result in all_results if result and result.get("id")}
     print(f"Total results: {len(all_results)}")
     print(f"Unique results: {len(unique_results)}")
-    print(list(unique_results.values()))
     #return deduped results
     return list(unique_results.values())
 

@@ -3,11 +3,14 @@ import json
 from dotenv import load_dotenv
 from datetime import datetime
 from etl.ingestion.search_playlists import spotify_searches
+from etl.ingestion.get_saved_tracks import get_saved_tracks
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
 #Load playlists seacrh results to s3
 def load_to_s3(results_list, entity_type):
+    #Load .env
+    load_dotenv()
     #lines for loading JSONL to s3
     lines = []
     #Grab date partials to build out s3 bucket/partition structure
@@ -22,7 +25,6 @@ def load_to_s3(results_list, entity_type):
         lines.append(json.dumps(result))
     #join resulting lines to jsonl string
     jsonl_string = "\n".join(lines)
-    print(jsonl_string)
     #Using creds to for s3 client connect
     client = boto3.client(
         "s3",
@@ -46,6 +48,9 @@ def load_to_s3(results_list, entity_type):
 def main():
     genre_list = ["prog rock", "progressive rock", "math rock"]
     searches = spotify_searches(genre_list, "playlist", 10)
-    load = load_to_s3(searches, "playlist")
+    load_to_s3(searches, "playlists")
+    saved_tracks = get_saved_tracks()
+    load_to_s3(saved_tracks, "saved_tracks")
+
 if __name__ == "__main__":
     main()

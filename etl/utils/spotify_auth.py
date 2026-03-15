@@ -33,7 +33,7 @@ def exchange_code_for_tokens(code):
     try:
         token_response = requests.post(auth_url, data=payload, auth=(os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET")))
         data = token_response.json()
-        refresh_token = data['refresh_token']
+        refresh_token = data.get('refresh_token')
     except HTTPError as e:
         print(f"HTTP error: {e.token_response['status_code']}")
     except RequestException as e:
@@ -56,7 +56,7 @@ def get_spotify_access_token ():
     try:
         token_response = requests.post(auth_url, data=payload, auth=(os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET")))
         data = token_response.json()
-        access_token = data['access_token']
+        access_token = data.get('access_token')
         return access_token
     except HTTPError as e:
         print(f"HTTP error: {e.token_response['status_code']}")
