@@ -3,14 +3,18 @@ import json
 import time
 from dotenv import load_dotenv
 from datetime import datetime
-from etl.utils.spotify_auth import get_spotify_access_token
 import requests
 from requests.exceptions import RequestException, HTTPError
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError   
+from difflib import SequenceMatcher
 
-def get_artist_genres():
+def names_match(name1, name2, threshold=0.8):
+    ratio = SequenceMatcher(None, name1.lower(), name2.lower()).ratio()
+    return ratio >= threshold
+
+def get_artists_genres():
     load_dotenv()
     #Using creds to for s3 client connect
     client = boto3.client(
@@ -78,13 +82,11 @@ def get_artist_genres():
     #Dedup the list of artists by making into a dictionary
     unique_artists = {result['id']:result for result in artists_list if result and result.get('id')}
     print(f"count of unique artists: {len(unique_artists)}")
-    #Grab unique artist names for later when we pull another source to enrich the artist data with genre
-    unique_artist_names = [unique_artists[p].get('name') for p in unique_artists if unique_artists[p] and unique_artists[p].get('name', {})]
-    #Get access token
-    token = get_spotify_access_token()
-    #Build out musicbrainz api call for each artist's genre tags
-    #Grab genre tags for each artist by name query
-    for name in unique_artist_names:
+    #Build out musicbrainz api call for each artist's genre tags - grab genre tags for each artist by artist name query
+    for a in unique_artists:
+        #Make the tags attribute empty if no tags are found as a match
+        unique_artists[a]['tags'] = []
+        name = unique_artists[a].get('name')
         musicbrainz_url = f"https://musicbrainz.org/ws/2/artist"
         headers = {
             "User-Agent": f"spotify-data-pipeline/1.0 (3jasonrodriguez@gmail.com)",
@@ -95,27 +97,37 @@ def get_artist_genres():
         }
         try:
             #grab search result with exception handling
-            musicbrainz_response = requests.get(musicbrainz_url, headers=headers,params=params, timeout=10)
-            time.sleep(0.1) 
+            time.sleep(2)
+            musicbrainz_response = requests.get(musicbrainz_url, headers=headers,params=params, timeout=10) 
             musicbrainz_response.raise_for_status()
             data = musicbrainz_response.json()
+            #Grabs artists from the query - there could be multiple
             artists = data.get("artists", [])
             if artists:
-                first_artist = artists[0]
-                
+                matched_artist = None
+                #do a fuzzy match for artist name
+                for artist in artists:
+                    if names_match(name, artist.get("name", "")):
+                        matched_artist = artist
+                        break
+                if matched_artist:
+                    #for a matching artist name, add a tags array for all matched genre tags from musicbrainz
+                    unique_artists[a]['tags'] = [ tag.get('name') for tag in matched_artist.get('tags', [])]
         except HTTPError as e:
             print(f"HTTP Error: {e}")
             continue
         except RequestException as e:
             print(f"Request failed: {e}")
+            time.sleep(5)
             continue
         #JSON parsing errors
         except (ValueError, KeyError) as e:
             print(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
             continue
-        #print(data)
+        print(unique_artists[a])
+    return list(unique_artists.values())
         
 def main():
-    a = get_artist_genres()
+    a = get_artists_genres()
 if __name__ == "__main__":
     main()

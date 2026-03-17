@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 from etl.ingestion.search_playlists import spotify_searches
 from etl.ingestion.get_saved_tracks import get_saved_tracks
+from etl.ingestion.get_artists_genres import get_artists_genres
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
@@ -46,11 +47,13 @@ def load_to_s3(results_list, entity_type):
 
 
 def main():
-    genre_list = ["prog rock", "progressive rock", "math rock"]
-    searches = spotify_searches(genre_list, "playlist", 10)
-    load_to_s3(searches, "playlists")
-    saved_tracks = get_saved_tracks()
-    load_to_s3(saved_tracks, "saved_tracks")
+    #genre_list = ["prog rock", "progressive rock", "math rock"]
+    #searches = spotify_searches(genre_list, "playlist", 10)
+    #load_to_s3(searches, "playlists")
+    #saved_tracks = get_saved_tracks()
+    #load_to_s3(saved_tracks, "saved_tracks")
+    art_genres = get_artists_genres()
+    load_to_s3(art_genres, "artists")
 
 if __name__ == "__main__":
     main()
