@@ -124,7 +124,6 @@ def get_artists_genres():
         except (ValueError, KeyError) as e:
             print(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
             continue
-        print(unique_artists[a])
     return list(unique_artists.values())
         
 def main():
