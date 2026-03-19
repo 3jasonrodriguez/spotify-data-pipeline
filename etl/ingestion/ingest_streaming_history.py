@@ -11,13 +11,12 @@ def ingest_streaming_history():
         config = yaml.safe_load(f)
     #Loading the files from the paths
     path = config["paths"]["streaming_history"]
-    files = os.listdir(path)
     #Only grab the audio files (json)
     json_files = [f for f in os.listdir(path) if f.endswith(".json")]
     #Using a dict to put each stream by year for later partitioning
     records_dict_year = {}
     #Fields removed from the spotify json records
-    fields_to_remove = ['ip_addr', 'episode_name','episode_show_name','spotify_episode_uri', 'audiobook_title', 'audiobook_uri','audiobook_chapter_uri', 'audiobook_chapter_title']
+    fields_to_remove = {'ip_addr', 'episode_name','episode_show_name','spotify_episode_uri', 'audiobook_title', 'audiobook_uri','audiobook_chapter_uri', 'audiobook_chapter_title'}
     #Loop through all files
     for filename in json_files:
         full_path = os.path.join(path, filename)
@@ -29,7 +28,10 @@ def ingest_streaming_history():
                     continue
                 filtered_record = {key: value for key, value in record.items() if key not in fields_to_remove}
                 #Extract the year of the timestamp
-                year = str(datetime.strptime(filtered_record.get('ts'), "%Y-%m-%dT%H:%M:%SZ").year)
+                ts = filtered_record.get('ts')
+                if not ts:
+                    continue
+                year = str(datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").year)
                 #Place record into the year key
                 if year in records_dict_year:
                     records_dict_year[year].append(filtered_record)
