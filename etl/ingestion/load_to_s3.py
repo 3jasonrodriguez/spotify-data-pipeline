@@ -2,14 +2,14 @@ import os
 import json
 from dotenv import load_dotenv
 from datetime import datetime
-from etl.ingestion.search_playlists import spotify_searches
-from etl.ingestion.get_saved_tracks import get_saved_tracks
-from etl.ingestion.get_artists_genres import get_artists_genres
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
 #Load playlists seacrh results to s3
 def load_to_s3(results_list, entity_type, year=None):
+    if not results_list:
+        print(f"No records to load for {entity_type}")
+        return
     #Load .env
     load_dotenv()
     #If a year is sent (for streaming data), use the yearly partition
@@ -19,10 +19,10 @@ def load_to_s3(results_list, entity_type, year=None):
         #Build out the s3 key for todays date
         #Grab date partials to build out s3 bucket/partition structure
         today = datetime.now()
-        year = today.strftime("%Y")
-        month = today.strftime("%m")
-        day = today.strftime("%d")
-        s3_key = f"raw/{entity_type}/year={year}/month={month}/day={day}/{entity_type}.jsonl"
+        yr = today.strftime("%Y")
+        mo = today.strftime("%m")
+        dy = today.strftime("%d")
+        s3_key = f"raw/{entity_type}/year={yr}/month={mo}/day={dy}/{entity_type}.jsonl"
     #Iterate through each result dictionary
     #lines for loading JSONL to s3
     lines = []
@@ -45,11 +45,11 @@ def load_to_s3(results_list, entity_type, year=None):
             Key=s3_key,
             Body=jsonl_string.encode("utf-8") # S3 expects bytes, so the jsonl string has to be encoded
         )
-        print("{s3_key} loaded to S3")
+        print(f"{s3_key} loaded to S3")
     except NoCredentialsError:
         print("AWS credentials not found - check your .env file")
     except ClientError as e:
-        print(f"S3 upload failed: {e}")
+        print(f"{s3_key} upload failed: {e}")
 
 
 def main():
