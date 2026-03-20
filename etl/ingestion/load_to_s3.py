@@ -5,6 +5,8 @@ from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
+from etl.ingestion.get_artists_genres import get_artists_genres
+from etl.ingestion.get_saved_tracks import get_saved_tracks
 #Load playlists seacrh results to s3
 def load_to_s3(results_list, entity_type, year=None):
     if not results_list:
@@ -56,10 +58,10 @@ def main():
     #genre_list = ["prog rock", "progressive rock", "math rock"]
     #searches = spotify_searches(genre_list, "playlist", 10)
     #load_to_s3(searches, "playlists")
-    #saved_tracks = get_saved_tracks()
-    #load_to_s3(saved_tracks, "saved_tracks")
-    #art_genres = get_artists_genres()
-    #load_to_s3(art_genres, "artists")
+    saved_tracks = get_saved_tracks()
+    load_to_s3(saved_tracks, "saved_tracks")
+    art_genres = get_artists_genres()
+    load_to_s3(art_genres, "artists")
     print()
 if __name__ == "__main__":
     main()

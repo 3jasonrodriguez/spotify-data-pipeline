@@ -41,7 +41,7 @@ def ingest_streaming_history():
             
 def main():
     records_by_year = ingest_streaming_history()
-    for year, records in records_by_year.items():
-        load_to_s3(records, "streaming_history", year)
+    #for year, records in records_by_year.items():
+     #   load_to_s3(records, "streaming_history", year)
 if __name__ == "__main__":
     main()

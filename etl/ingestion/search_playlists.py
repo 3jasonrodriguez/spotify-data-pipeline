@@ -74,6 +74,6 @@ def spotify_searches(search_list, search_type, limit):
 #Define main for reusability and importing
 def main():
     genre_list = ["prog rock", "progressive rock", "math rock"]
-    searches = spotify_searches(genre_list, "playlist", 10)
+    searches = spotify_searches(genre_list, "playlists", 10)
 if __name__ == "__main__":
     main()
