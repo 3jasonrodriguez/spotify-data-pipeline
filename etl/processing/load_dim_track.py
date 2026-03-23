@@ -4,21 +4,20 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
 
-def load_dim_genre():
+def load_dim_artist():
     load_dotenv()
-    genre_query = "SELECT DISTINCT tag FROM artists CROSS JOIN UNNEST(tags) AS t(tag) WHERE tag IS NOT NULL"
+    artist_query = "SELECT DISTINCT id, name FROM artists"
     #Run athena query
-    rows = run_athena_query(genre_query)
+    rows = run_athena_query(artist_query)
     if not rows:
-        print(f"No rows returned from the athena query: {genre_query}")
+        print(f"No rows returned from the athena query: {artist_query}")
         return
-    genre_set = set()
-    #Grab the genres and add them to the genre set
-    for r in rows[1:]:
-        genre = r['Data'][0].get('VarCharValue')
-        genre_set.add(genre)
+    artist_set = set()
+    #Grab the artist id/name and add them to the artist set
+    for a in rows[1:]:
+        artist_set.add((a.get('Data')[0].get('VarCharValue'), a.get('Data')[1].get('VarCharValue')))
     conn = None
-    try:
+    '''try:
         #Open postgres connection
         with psycopg2.connect(
             host=os.getenv("POSTGRES_HOST"),
@@ -31,18 +30,18 @@ def load_dim_genre():
                 #Parameterize the genres into the insert commands
                 results = execute_values(
                     cursor,
-                    "INSERT INTO dim_genre (genre_name) VALUES %s ON CONFLICT (genre_name) DO NOTHING",
-                    [(genre,) for genre in genre_set]
+                    "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (spotify_artist_id) DO NOTHING",
+                    [(artist[0],artist[1]) for artist in artist_set]
                 )
             #Commit the statements
             conn.commit()
-            print(f"Loaded {len(genre_set)} genres into dim_genre")
+            print(f"Loaded {len(artist_set)} artists into dim_track")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
-        conn.rollback()
+        conn.rollback()'''
 
 def main():
-    l = load_dim_genre()
+    l = load_dim_artist()
 if __name__ == "__main__":
     main()

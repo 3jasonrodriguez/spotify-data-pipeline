@@ -15,17 +15,22 @@ CREATE TABLE dim_track (
     track_name VARCHAR(255),
     duration_ms INT
 );
+ALTER TABLE dim_track ADD CONSTRAINT unique_spotify_track_id UNIQUE (spotify_track_id);
+
 
 CREATE TABLE dim_artist (
     artist_key SERIAL PRIMARY KEY,
     spotify_artist_id VARCHAR(30),
     artist_name VARCHAR(255)
 );
+ALTER TABLE dim_artist ADD CONSTRAINT unique_spotify_artist_id UNIQUE (spotify_artist_id);
 
 CREATE TABLE dim_genre (
     genre_key SERIAL PRIMARY KEY,
     genre_name VARCHAR(255)
 );
+ALTER TABLE dim_genre ADD CONSTRAINT unique_genre_name UNIQUE (genre_name);
+
 
 CREATE TABLE dim_library (
     library_key SERIAL PRIMARY KEY,
