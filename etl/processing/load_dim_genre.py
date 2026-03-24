@@ -13,8 +13,9 @@ def load_dim_genre():
         print(f"No rows returned from the athena query: {genre_query}")
         return
     genre_set = set()
-    #Grab the genres and add them to the genre set
+    #iterate over rows after the headers
     for r in rows[1:]:
+        #Grab the genres and add them to the genre set
         genre = r['Data'][0].get('VarCharValue')
         genre_set.add(genre)
     conn = None

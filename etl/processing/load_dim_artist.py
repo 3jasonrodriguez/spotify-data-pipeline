@@ -13,9 +13,12 @@ def load_dim_artist():
         print(f"No rows returned from the athena query: {artist_query}")
         return
     artist_set = set()
-    #Grab the artist id/name and add them to the artist set
+    #iterate over each row after the headers
     for a in rows[1:]:
-        artist_set.add((a.get('Data')[0].get('VarCharValue'), a.get('Data')[1].get('VarCharValue')))
+        #Grab the artist id/name and add them to the artist set
+        artist_id = a.get('Data')[0].get('VarCharValue')
+        name = a.get('Data')[1].get('VarCharValue')
+        artist_set.add((artist_id, name))
     conn = None
     try:
         #Open postgres connection

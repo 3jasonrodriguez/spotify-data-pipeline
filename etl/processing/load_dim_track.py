@@ -4,20 +4,29 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
 
-def load_dim_artist():
+def load_dim_track():
     load_dotenv()
-    artist_query = "SELECT DISTINCT id, name FROM artists"
+    tracks_query = """ with id_name_hist as (SELECT distinct SUBSTR(spotify_track_uri, 15) as track_id, master_metadata_track_name as track_name
+                FROM streaming_history)
+                SELECT track_id, track_name, st.track.duration_ms as duration_ms
+                FROM id_name_hist hist LEFT JOIN saved_tracks st on hist.track_id=st.track.id
+                WHERE hist.track_name IS NOT NULL"""
     #Run athena query
-    rows = run_athena_query(artist_query)
+    rows = run_athena_query(tracks_query)
     if not rows:
-        print(f"No rows returned from the athena query: {artist_query}")
+        print(f"No rows returned from the athena query: {tracks_query}")
         return
-    artist_set = set()
-    #Grab the artist id/name and add them to the artist set
-    for a in rows[1:]:
-        artist_set.add((a.get('Data')[0].get('VarCharValue'), a.get('Data')[1].get('VarCharValue')))
+    tracks_set = set()
+    #iterate over each row after the headers
+    for t in rows[1:]:
+        #Grab the track id/name/duration and add them to the artist set
+        track_id = t.get('Data')[0].get('VarCharValue')
+        name = t.get('Data')[1].get('VarCharValue')
+        duration = t.get('Data')[2].get('VarCharValue')
+        duration = int(duration) if duration else None
+        tracks_set.add((track_id, name, duration))
     conn = None
-    '''try:
+    try:
         #Open postgres connection
         with psycopg2.connect(
             host=os.getenv("POSTGRES_HOST"),
@@ -30,18 +39,18 @@ def load_dim_artist():
                 #Parameterize the genres into the insert commands
                 results = execute_values(
                     cursor,
-                    "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (spotify_artist_id) DO NOTHING",
-                    [(artist[0],artist[1]) for artist in artist_set]
+                    "INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO NOTHING",
+                    [(track[0], track[1], track[2]) for track in tracks_set]
                 )
             #Commit the statements
             conn.commit()
-            print(f"Loaded {len(artist_set)} artists into dim_track")
+            print(f"Loaded {len(tracks_set)} tracks into dim_track")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
-        conn.rollback()'''
+        conn.rollback()
 
 def main():
-    l = load_dim_artist()
+    l = load_dim_track()
 if __name__ == "__main__":
     main()
