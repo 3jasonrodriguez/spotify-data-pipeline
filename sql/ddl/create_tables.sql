@@ -9,6 +9,8 @@ CREATE TABLE dim_date (
     day_of_week VARCHAR(10)
 );
 
+ALTER TABLE dim_date ADD CONSTRAINT unique_date_hour UNIQUE (full_date, hour);
+
 CREATE TABLE dim_track (
     track_key SERIAL PRIMARY KEY,
     spotify_track_id VARCHAR(30),
@@ -37,6 +39,7 @@ CREATE TABLE dim_library (
     track_key INT REFERENCES dim_track(track_key),
     saved_at TIMESTAMP
 );
+ALTER TABLE dim_library ADD CONSTRAINT unique_library_track UNIQUE (track_key);
 
 CREATE TABLE bridge_artist_genre (
     artist_key INT REFERENCES dim_artist(artist_key),

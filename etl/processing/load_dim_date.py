@@ -37,9 +37,8 @@ FROM streaming_history"""
         dt = date(year, month, day)
         day_of_week = calendar.day_name[dt.weekday()]
         dates_set.add((full_date, is_work_hr, year, month, day, hour, day_of_week))
-    print(dates_set)
     conn = None
-    '''try:
+    try:
         #Open postgres connection
         with psycopg2.connect(
             host=os.getenv("POSTGRES_HOST"),
@@ -49,19 +48,20 @@ FROM streaming_history"""
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
-                #Parameterize the genres into the insert commands
+                #Parameterize the dates into the insert commands
                 results = execute_values(
                     cursor,
-                    "INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO NOTHING",
-                    [(track[0], track[1], track[2]) for track in tracks_set]
+                    "INSERT INTO dim_date (full_date, is_work_hour, year, month, day, hour, day_of_week) VALUES %s",
+                    [(d[0], d[1], d[2], d[3], d[4], d[5], d[6]) for d in dates_set]
                 )
+                inserted_count = cursor.rowcount
             #Commit the statements
             conn.commit()
-            print(f"Loaded {len(tracks_set)} tracks into dim_track")
+            print(f"Inserted {inserted_count} records into dim_date")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
-        conn.rollback()'''
+        conn.rollback()
 
 def main():
     l = load_dim_date()

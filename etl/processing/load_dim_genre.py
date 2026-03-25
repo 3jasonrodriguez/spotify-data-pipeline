@@ -35,9 +35,10 @@ def load_dim_genre():
                     "INSERT INTO dim_genre (genre_name) VALUES %s ON CONFLICT (genre_name) DO NOTHING",
                     [(genre,) for genre in genre_set]
                 )
+                inserted_count = cursor.rowcount
             #Commit the statements
             conn.commit()
-            print(f"Loaded {len(genre_set)} genres into dim_genre")
+            print(f"Inserted {inserted_count} records into dim_genre")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure

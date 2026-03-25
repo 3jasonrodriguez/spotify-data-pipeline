@@ -36,9 +36,11 @@ def load_dim_artist():
                     "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (spotify_artist_id) DO NOTHING",
                     [(artist[0],artist[1]) for artist in artist_set]
                 )
+                #Grab rwo count for the insert statement
+                inserted_count = cursor.rowcount
             #Commit the statements
             conn.commit()
-            print(f"Loaded {len(artist_set)} artists into dim_artist")
+            print(f"Inserted {inserted_count} records into dim_artist")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
