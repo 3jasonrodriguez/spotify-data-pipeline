@@ -49,16 +49,22 @@ def load_dim_track():
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
+                #Grab the table row count so we can compare after the insert
+                #We are doing the count of inserted records this way because cursor.rowcount is not consistent
+                cursor.execute("SELECT count(*) from dim_track")
+                row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
-                results = execute_values(
+                execute_values(
                     cursor,
                     "INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO NOTHING",
                     [(track[0], track[1], track[2]) for track in tracks_set]
                 )
-                inserted_count = cursor.rowcount
-            #Commit the statements
+                #Grab table row count after the insert for comparison
+                cursor.execute("SELECT count(*) from dim_track")
+                row_count_after = int(cursor.fetchall()[0][0])
+                diff_row_count = row_count_after-row_count_before
+                print(f"Inserted {diff_row_count} new records into dim_track")
             conn.commit()
-            print(f"Inserted {inserted_count} records into dim_track")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure

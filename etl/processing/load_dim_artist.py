@@ -6,7 +6,14 @@ from etl.processing.athena_utils import run_athena_query
 
 def load_dim_artist():
     load_dotenv()
-    artist_query = "SELECT DISTINCT id, name FROM artists"
+    #Grabbing artists from saved tracks in the library and streaming history.
+    #This grabs all artists even if they aren't in the library 
+    artist_query = '''SELECT DISTINCT id, name 
+                    FROM artists 
+                    union 
+                    SELECT DISTINCT NULL, master_metadata_album_artist_name
+                    FROM streaming_history
+                    WHERE master_metadata_album_artist_name IS NOT NULL'''
     #Run athena query
     rows = run_athena_query(artist_query)
     if not rows:
@@ -30,17 +37,22 @@ def load_dim_artist():
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
+                #Grab the table row count so we can compare after the insert
+                #We are doing the count of inserted records this way because cursor.rowcount is not consistent
+                cursor.execute("SELECT count(*) from dim_artist")
+                row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
-                results = execute_values(
+                execute_values(
                     cursor,
-                    "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (spotify_artist_id) DO NOTHING",
+                    "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (artist_name) DO NOTHING",
                     [(artist[0],artist[1]) for artist in artist_set]
                 )
-                #Grab rwo count for the insert statement
-                inserted_count = cursor.rowcount
-            #Commit the statements
+                #Grab table row count after the insert for comparison
+                cursor.execute("SELECT count(*) from dim_artist")
+                row_count_after = int(cursor.fetchall()[0][0])
+                diff_row_count = row_count_after-row_count_before
+                print(f"Inserted {diff_row_count} new records into dim_artist")
             conn.commit()
-            print(f"Inserted {inserted_count} records into dim_artist")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure

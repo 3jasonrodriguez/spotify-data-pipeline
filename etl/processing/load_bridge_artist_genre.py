@@ -3,9 +3,6 @@ import os
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
-from datetime import datetime
-from datetime import date
-import calendar
 import pandas as pd
 
 def load_bridge_artist_genre():
@@ -40,6 +37,10 @@ def load_bridge_artist_genre():
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
+                #Grab the table row count so we can compare after the insert
+                #We are doing the count of inserted records this way because cursor.rowcount is not consistent
+                cursor.execute("SELECT count(*) from bridge_artist_genre")
+                row_count_before = int(cursor.fetchall()[0][0])
                 #Grab mapping of track ids and track keys
                 cursor.execute("SELECT DISTINCT artist_name, artist_key  FROM dim_artist")
                 artist_mapping = {row[0]: row[1] for row in cursor.fetchall()}
@@ -55,11 +56,12 @@ def load_bridge_artist_genre():
                     "INSERT INTO bridge_artist_genre (artist_key, genre_key) VALUES %s ON CONFLICT (artist_key, genre_key) DO NOTHING",
                     [(r[0], r[1]) for r in valid_rows]
                 )
-                #Grab rwo count for the insert statement
-                inserted_count = cursor.rowcount
-            #Commit the statements
+                #Grab table row count after the insert for comparison
+                cursor.execute("SELECT count(*) from bridge_artist_genre")
+                row_count_after = int(cursor.fetchall()[0][0])
+                diff_row_count = row_count_after-row_count_before
+                print(f"Inserted {diff_row_count} new records into bridge_artist_genre")
             conn.commit()
-            print(f"Inserted {inserted_count} records into bridge_artist_genre")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure

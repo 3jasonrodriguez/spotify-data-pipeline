@@ -26,6 +26,7 @@ CREATE TABLE dim_artist (
     artist_name VARCHAR(255)
 );
 ALTER TABLE dim_artist ADD CONSTRAINT unique_spotify_artist_id UNIQUE (spotify_artist_id);
+ALTER TABLE dim_artist ADD CONSTRAINT unique_artist_name UNIQUE (artist_name);
 
 CREATE TABLE dim_genre (
     genre_key SERIAL PRIMARY KEY,

@@ -48,16 +48,22 @@ FROM streaming_history"""
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
+                #Grab the table row count so we can compare after the insert
+                #We are doing the count of inserted records this way because cursor.rowcount is not consistent
+                cursor.execute("SELECT count(*) from dim_date")
+                row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the dates into the insert commands
-                results = execute_values(
+                execute_values(
                     cursor,
-                    "INSERT INTO dim_date (full_date, is_work_hour, year, month, day, hour, day_of_week) VALUES %s",
+                    "INSERT INTO dim_date (full_date, is_work_hour, year, month, day, hour, day_of_week) VALUES %s ON CONFLICT (full_date, hour) DO NOTHING",
                     [(d[0], d[1], d[2], d[3], d[4], d[5], d[6]) for d in dates_set]
                 )
-                inserted_count = cursor.rowcount
-            #Commit the statements
+                #Grab table row count after the insert for comparison
+                cursor.execute("SELECT count(*) from dim_date")
+                row_count_after = int(cursor.fetchall()[0][0])
+                diff_row_count = row_count_after-row_count_before
+                print(f"Inserted {diff_row_count} new records into dim_date")
             conn.commit()
-            print(f"Inserted {inserted_count} records into dim_date")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure

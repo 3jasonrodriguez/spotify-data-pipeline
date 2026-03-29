@@ -29,16 +29,22 @@ def load_dim_genre():
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             with conn.cursor() as cursor:
+                #Grab the table row count so we can compare after the insert
+                #We are doing the count of inserted records this way because cursor.rowcount is not consistent
+                cursor.execute("SELECT count(*) from dim_genre")
+                row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
-                results = execute_values(
+                execute_values(
                     cursor,
                     "INSERT INTO dim_genre (genre_name) VALUES %s ON CONFLICT (genre_name) DO NOTHING",
                     [(genre,) for genre in genre_set]
                 )
-                inserted_count = cursor.rowcount
-            #Commit the statements
+                #Grab table row count after the insert for comparison
+                cursor.execute("SELECT count(*) from dim_genre")
+                row_count_after = int(cursor.fetchall()[0][0])
+                diff_row_count = row_count_after-row_count_before
+                print(f"Inserted {diff_row_count} new records into dim_genre")
             conn.commit()
-            print(f"Inserted {inserted_count} records into dim_genre")
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
