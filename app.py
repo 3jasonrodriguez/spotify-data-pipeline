@@ -23,7 +23,18 @@ def app():
                 st.title("My Spotify Analytics")
                 st.header("Hours Listened Per Year")
                 st.bar_chart(hours_per_year_df.set_index('year'))
-            #conn.commit()
+
+                ten_most_played_songs_query = '''with plays as 
+                    (SELECT artist_name, track_name, count(*) as play_counts
+                    FROM fact_play_event f INNER JOIN dim_track t on f.track_key=t.track_key inner join dim_artist a on f.artist_key=a.artist_key
+                    GROUP BY artist_name, track_name)
+                SELECT artist_name, track_name, play_counts
+                FROM plays
+                ORDER BY play_counts DESC
+                LIMIT 10'''
+                ten_most_played_songs_query_df = pd.read_sql(ten_most_played_songs_query, conn)
+                st.dataframe(ten_most_played_songs_query_df)
+
     except psycopg2.Error as e:
         print(f"Postgres error: {e}")
         #Rollback on failure
