@@ -4,6 +4,9 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
 import pandas as pd
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def load_bridge_artist_genre():
     load_dotenv()
@@ -60,10 +63,10 @@ def load_bridge_artist_genre():
                 cursor.execute("SELECT count(*) from bridge_artist_genre")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                print(f"Inserted {diff_row_count} new records into bridge_artist_genre")
+                logging.info(f"Inserted {diff_row_count} new records into bridge_artist_genre")
             conn.commit()
     except psycopg2.Error as e:
-        print(f"Postgres error: {e}")
+        logging.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

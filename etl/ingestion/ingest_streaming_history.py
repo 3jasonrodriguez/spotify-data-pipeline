@@ -3,7 +3,9 @@ import os
 import json 
 from datetime import datetime
 from etl.ingestion.load_to_s3 import load_to_s3
-
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def ingest_streaming_history():
     #Loading of config file with path to streaming history
@@ -41,7 +43,5 @@ def ingest_streaming_history():
             
 def main():
     records_by_year = ingest_streaming_history()
-    #for year, records in records_by_year.items():
-     #   load_to_s3(records, "streaming_history", year)
 if __name__ == "__main__":
     main()

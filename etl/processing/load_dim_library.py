@@ -4,6 +4,9 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
 import pandas as pd
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def load_dim_library():
     load_dotenv()
@@ -12,7 +15,7 @@ def load_dim_library():
     #Run athena query
     rows = run_athena_query(lib_query)
     if not rows:
-        print(f"No rows returned from the athena query: {lib_query}")
+        logging.warning(f"No rows returned from the athena query: {lib_query}")
         return
     library_set = set()
     #iterate over each row after the headers
@@ -50,10 +53,10 @@ def load_dim_library():
                 #Grab table row count after the insert for comparison
                 cursor.execute("SELECT count(*) from dim_library")
                 row_count_after = int(cursor.fetchall()[0][0])
-                print(f"Inserted {row_count_after} records into dim_library")
+                logging.info(f"Inserted {row_count_after} records into dim_library")
             conn.commit()
     except psycopg2.Error as e:
-        print(f"Postgres error: {e}")
+        logging.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

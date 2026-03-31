@@ -5,7 +5,12 @@ from dotenv import load_dotenv
 import streamlit as st
 import altair as alt
 from datetime import datetime, timezone
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 import sql.streamlit_queries as streamlit_queries
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def top_ten_songs(conn):
     query = streamlit_queries.TOP_TEN_SONGS
@@ -17,21 +22,47 @@ def top_ten_songs(conn):
 def yearly_streaming_hours(conn):
     query = streamlit_queries.HOURS_PER_YEAR
     df = pd.read_sql(query, conn)
-    st.header("Hours Listened Per Year")
+    st.header("Annual Streaming Hours")
     #Display bar chart
-    st.bar_chart(df.set_index('year'), color="#7DF9FF")  
+    st.bar_chart(df.set_index('year'), color="#7DF9FF", x_label="Year", y_label="Hours Listened")  
 
 def genre_trends(conn):
     query = streamlit_queries.GENRE_YEAR_TRENDS
     df = pd.read_sql(query, conn)
     st.header("Yearly Genre Trends")
-    #Display data table
-    st.dataframe(df, hide_index=True)
     pivot_df = df.pivot(index='year', columns='genre_name', values='hours_played')
-    st.line_chart(pivot_df)
+    pivot_df.index = pivot_df.index.astype(str)
+    st.line_chart(pivot_df, x_label="Year", y_label="Hours Played")
+
+def generate_word_cloud(text_data):
+    #This function expects the text to be split into one string separating the many strings
+    # Instantiate and generate the word cloud object
+    wordcloud = WordCloud(
+        width=700, 
+        height=300, 
+        background_color="black", 
+        colormap='cool',
+        max_words=100,
+        repeat=False
+    ).generate(text_data)
+    return wordcloud
+
+def artists_wordcloud(conn):
+    query = streamlit_queries.ALL_ARTISTS
+    df = pd.read_sql(query, conn)
+    st.header("Top Artists")
+    text_artists = " ".join(df['artist_name'].astype(str).tolist())
+    wc = generate_word_cloud(text_artists)
+    # Create a Matplotlib figure
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+    ax.imshow(wc, interpolation='bilinear')
+    ax.axis("off") # Hide the axes
+    st.pyplot(fig) 
+
 def date_streams(conn):
     query = streamlit_queries.DATE_STREAMS
     df = pd.read_sql(query, conn)
+    st.header("All Music Streams")
     #Aggregate the hours played by date
     day_hours = df.groupby("full_date")["hours_played"].sum().reset_index()
     #Define the selection on click for a date
@@ -90,12 +121,16 @@ def app():
             password=os.getenv("POSTGRES_PASSWORD")
         ) as conn:
             #Render the Visualizations
+            st.set_page_config(layout="wide")
             st.title("My Spotify Analytics")
+            date_streams(conn)
+            genre_trends(conn)
             top_ten_songs(conn)
             yearly_streaming_hours(conn)
-            genre_trends(conn)
-            date_streams(conn)
+            artists_wordcloud(conn)
+
     except psycopg2.Error as e:
+        logging.error(f"Database error: {e}")
         st.error(f"Database error: {e}")
         if conn:
             conn.rollback()

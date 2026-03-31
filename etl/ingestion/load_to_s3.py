@@ -7,10 +7,14 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
 from etl.ingestion.get_artists_genres import get_artists_genres
 from etl.ingestion.get_saved_tracks import get_saved_tracks
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
+
 #Load playlists seacrh results to s3
 def load_to_s3(results_list, entity_type, year=None):
     if not results_list:
-        print(f"No records to load for {entity_type}")
+        logging.warning(f"No records to load for {entity_type}")
         return
     #Load .env
     load_dotenv()
@@ -47,11 +51,11 @@ def load_to_s3(results_list, entity_type, year=None):
             Key=s3_key,
             Body=jsonl_string.encode("utf-8") # S3 expects bytes, so the jsonl string has to be encoded
         )
-        print(f"{s3_key} loaded to S3")
+        logging.info(f"{s3_key} loaded to S3")
     except NoCredentialsError:
-        print("AWS credentials not found - check your .env file")
+        logging.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        print(f"{s3_key} upload failed: {e}")
+        logging.error(f"{s3_key} upload failed: {e}")
 
 
 def main():
@@ -62,6 +66,5 @@ def main():
     load_to_s3(saved_tracks, "saved_tracks")
     art_genres = get_artists_genres()
     load_to_s3(art_genres, "artists")
-    print()
 if __name__ == "__main__":
     main()

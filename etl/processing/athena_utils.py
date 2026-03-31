@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError   
-
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 #Pass the string parameter into this function to execute the Athena query and return the results
 def run_athena_query(query):
     load_dotenv()
@@ -35,7 +37,7 @@ def run_athena_query(query):
             if status in ["SUCCEEDED", "FAILED", "CANCELLED"]:
                 #Query failure and break
                 if status == "FAILED":
-                    print(f"Query failed: {athena_client.get_query_execution(QueryExecutionId=execution_id)['QueryExecution']['Status']['StateChangeReason']}")
+                    logging.error(f"Query failed: {athena_client.get_query_execution(QueryExecutionId=execution_id)['QueryExecution']['Status']['StateChangeReason']}")
                     return None
                 break
             time.sleep(1)
@@ -54,10 +56,10 @@ def run_athena_query(query):
             #Add more rows
             rows.extend(response['ResultSet']['Rows'])
     except NoCredentialsError:
-        print("AWS credentials not found - check your .env file")
+        logging.error("AWS credentials not found - check your .env file")
         return
     except ClientError as e:
-        print(f"Athena query failed: {e}") 
+        logging.error(f"Athena query failed: {e}") 
         return 
     #Return rows to be parsed downstream since the structures will be different for different queries
     return rows

@@ -4,6 +4,9 @@ import json
 from dotenv import load_dotenv
 from requests.exceptions import RequestException, HTTPError
 from urllib.parse import urlencode
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 #Build out the initial url to manually get the auth code
 def get_auth_code_url():
@@ -35,11 +38,11 @@ def exchange_code_for_tokens(code):
         data = token_response.json()
         refresh_token = data.get('refresh_token')
     except HTTPError as e:
-        print(f"HTTP error: {e.token_response['status_code']}")
+        logging.error(f"HTTP error: {e.token_response['status_code']}")
     except RequestException as e:
-        print(f"Connection error: {e}")
+        logging.error(f"Connection error: {e}")
     except ValueError:
-        print("Invalid JSON response")
+        logging.error("Invalid JSON response")
     return None
 
 
@@ -59,9 +62,9 @@ def get_spotify_access_token ():
         access_token = data.get('access_token')
         return access_token
     except HTTPError as e:
-        print(f"HTTP error: {e.token_response['status_code']}")
+        logging.error(f"HTTP error: {e.token_response['status_code']}")
     except RequestException as e:
-        print(f"Connection error: {e}")
+        logging.error(f"Connection error: {e}")
     except ValueError:
-        print("Invalid JSON response")
+        logging.error("Invalid JSON response")
     return None

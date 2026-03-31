@@ -1,7 +1,9 @@
 from etl.utils.spotify_auth import get_spotify_access_token
 import requests
 from requests.exceptions import RequestException, HTTPError
-
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 #Function to iterate over a list of searchable objects in the Spotify search.
 #Search_list is a list of the strings for the object type we will search through
 #Search types are defined within this function in a map
@@ -37,17 +39,17 @@ def spotify_searches(search_list, search_type, limit):
             data = search_response.json()
 
         except HTTPError as e:
-            print(f"HTTP Error: {e}")
+            logging.error(f"HTTP Error: {e}")
             continue
         except RequestException as e:
-            print(f"Request failed: {e}")
+            logging.error(f"Request failed: {e}")
             continue
         #JSON parsing errors
         except (ValueError, KeyError) as e:
-            print(f"Failed to parse JSON for query '{query}': {e}")
+            logging.error(f"Failed to parse JSON for query '{query}': {e}")
             continue
 
-        print(f"result for {query}")
+        logging.debug(f"result for {query}")
         #Grab items within a search result, even if the search types and items keys are missing
         items = data.get(type_map[search_type], {}).get("items", [])
         #strip the quotes before looking for names and descriptions
@@ -60,13 +62,13 @@ def spotify_searches(search_list, search_type, limit):
                 clean_query in p.get("description", "").lower()
             )
         ]        
-        print(f"Query: {query} -> {len(cleansed_items)} results")
+        logging.debug(f"Query: {query} -> {len(cleansed_items)} results")
         #Append items to collected list
         all_results.extend(cleansed_items)
     # Deduped search results by creating a dictionary keyed by id.
     unique_results = {result["id"]: result for result in all_results if result and result.get("id")}
-    print(f"Total results: {len(all_results)}")
-    print(f"Unique results: {len(unique_results)}")
+    logging.info(f"Total results: {len(all_results)}")
+    logging.info(f"Unique results: {len(unique_results)}")
     #return deduped results
     return list(unique_results.values())
 

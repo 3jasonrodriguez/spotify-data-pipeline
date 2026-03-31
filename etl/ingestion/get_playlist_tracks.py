@@ -8,6 +8,9 @@ from requests.exceptions import RequestException, HTTPError
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def get_playlist_tracks():
     load_dotenv()
@@ -25,13 +28,13 @@ def get_playlist_tracks():
             Prefix="raw/playlist/",
         )
     except NoCredentialsError:
-        print("AWS credentials not found - check your .env file")
+        logging.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        print(f"S3 data pull failed: {e}")
+        logging.error(f"S3 data pull failed: {e}")
     #Grab S3 contents containing the keys within the prefix
     partition_contents = partitions.get("Contents", [])
     if not partition_contents:
-        print("No partitions found in S3")
+        logging.warning("No partitions found in S3")
         return
    #Used to grab all yyyymmdd extracted values to determine the latest
     part_list = []
@@ -51,9 +54,9 @@ def get_playlist_tracks():
             Key = f"raw/playlist/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/playlist.jsonl"
         )
     except NoCredentialsError:
-        print("AWS credentials not found - check your .env file")
+        logging.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        print(f"S3 data pull failed: {e}")
+        logging.error(f"S3 data pull failed: {e}")
     #Contents from s3 pull
     playlists_contents = playlist_file["Body"].read().decode("utf-8")
     #Splits the jsonl string into a list of lines, removes trailing newlines, skips empty lines, parses each line into a dict 
@@ -79,17 +82,15 @@ def get_playlist_tracks():
             items_response.raise_for_status()
             data = items_response.json()
         except HTTPError as e:
-            print(f"HTTP Error: {e}")
+            logging.error(f"HTTP Error: {e}")
             continue
         except RequestException as e:
-            print(f"Request failed: {e}")
+            logging.error(f"Request failed: {e}")
             continue
         #JSON parsing errors
         except (ValueError, KeyError) as e:
-            print(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
-            continue
-        print(data)
-    
+            logging.error(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
+            continue    
 def main():
     playlist_tracks = get_playlist_tracks()
 if __name__ == "__main__":

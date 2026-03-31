@@ -20,7 +20,7 @@ GENRE_YEAR_TRENDS='''with year_genres as
                     FROM year_genres)
                     SELECT year, genre_name, hours_played, rank
                     FROM ranks 
-                    WHERE rank <=3
+                    WHERE rank <=10
                     order by year, rank asc'''
 
 DATE_STREAMS='''with day_plays as (SELECT full_date, artist_name, track_name, ROUND(SUM(ms_played) / 3600000.00, 2) as hours_played
@@ -28,3 +28,6 @@ DATE_STREAMS='''with day_plays as (SELECT full_date, artist_name, track_name, RO
                                         GROUP BY full_date, artist_name, track_name)
                                         SELECT full_date, artist_name, track_name,hours_played
                                         FROM day_plays '''
+ALL_ARTISTS='''SELECT artist_name
+                FROM dim_artist a INNER JOIN fact_play_event f ON a.artist_key=f.artist_key
+                WHERE artist_name IS NOT NULL'''

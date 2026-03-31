@@ -6,20 +6,23 @@ from etl.processing.athena_utils import run_athena_query
 from datetime import datetime
 from datetime import date
 import calendar
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def load_dim_date():
     load_dotenv()
     date_query = """SELECT DISTINCT 
-    DATE(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as full_date,
-    YEAR(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as year,
-    MONTH(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as month,
-    DAY(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as day,
-    HOUR(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as hour
-FROM streaming_history"""
+        DATE(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as full_date,
+        YEAR(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as year,
+        MONTH(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as month,
+        DAY(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as day,
+        HOUR(from_iso8601_timestamp(ts) AT TIME ZONE 'America/New_York') as hour
+    FROM streaming_history"""
     #Run athena query
     rows = run_athena_query(date_query)
     if not rows:
-        print(f"No rows returned from the athena query: {date_query}")
+        logging.warning(f"No rows returned from the athena query: {date_query}")
         return
     dates_set = set()
     #iterate over each row after the headers
@@ -62,10 +65,10 @@ FROM streaming_history"""
                 cursor.execute("SELECT count(*) from dim_date")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                print(f"Inserted {diff_row_count} new records into dim_date")
+                logging.info(f"Inserted {diff_row_count} new records into dim_date")
             conn.commit()
     except psycopg2.Error as e:
-        print(f"Postgres error: {e}")
+        logging.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

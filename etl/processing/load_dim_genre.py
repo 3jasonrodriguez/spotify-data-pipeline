@@ -3,6 +3,9 @@ import os
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
+import logging
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 def load_dim_genre():
     load_dotenv()
@@ -10,7 +13,7 @@ def load_dim_genre():
     #Run athena query
     rows = run_athena_query(genre_query)
     if not rows:
-        print(f"No rows returned from the athena query: {genre_query}")
+        logging.warning(f"No rows returned from the athena query: {genre_query}")
         return
     genre_set = set()
     #iterate over rows after the headers
@@ -43,10 +46,10 @@ def load_dim_genre():
                 cursor.execute("SELECT count(*) from dim_genre")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                print(f"Inserted {diff_row_count} new records into dim_genre")
+                logging.info(f"Inserted {diff_row_count} new records into dim_genre")
             conn.commit()
     except psycopg2.Error as e:
-        print(f"Postgres error: {e}")
+        logging.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 
