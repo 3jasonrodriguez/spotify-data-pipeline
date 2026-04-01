@@ -3,3 +3,4 @@ __pycache__/
 .env
 data/raw/streaming_history
 pipeline.log
+config.yaml

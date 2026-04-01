@@ -26,6 +26,25 @@ def yearly_streaming_hours(conn):
     #Display bar chart
     st.bar_chart(df.set_index('year'), color="#7DF9FF", x_label="Year", y_label="Hours Listened")  
 
+def listening_streaks(conn):
+    query = streamlit_queries.LISTENING_STREAK
+    df = pd.read_sql(query, conn)
+    st.header("Track Listening Streaks")
+    #Display bar chart
+    st.dataframe(df, hide_index=True)
+
+def streams_by_day(conn):
+    query = streamlit_queries.STREAMS_BY_DAY
+    df = pd.read_sql(query, conn)
+    st.header("Streams By Day")
+    #Display bar chart
+    day_order = ["Sunday","Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    #Convert 'day' column to ordered categorical
+    df['day_of_week'] = pd.Categorical(df['day_of_week'], categories=day_order, ordered=True)
+    #Sort the dataframe based on the categorical order
+    df = df.sort_values('day_of_week')
+    st.bar_chart(df, color="#7DF9FF", x_label="Day of the Week", y_label="Hours Listened", x="day_of_week", y="hours_played")  
+
 def genre_trends(conn):
     query = streamlit_queries.GENRE_YEAR_TRENDS
     df = pd.read_sql(query, conn)
@@ -125,6 +144,8 @@ def app():
             st.title("My Spotify Analytics")
             date_streams(conn)
             genre_trends(conn)
+            listening_streaks(conn)
+            streams_by_day(conn)
             top_ten_songs(conn)
             yearly_streaming_hours(conn)
             artists_wordcloud(conn)

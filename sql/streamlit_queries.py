@@ -31,3 +31,34 @@ DATE_STREAMS='''with day_plays as (SELECT full_date, artist_name, track_name, RO
 ALL_ARTISTS='''SELECT artist_name
                 FROM dim_artist a INNER JOIN fact_play_event f ON a.artist_key=f.artist_key
                 WHERE artist_name IS NOT NULL'''
+STREAMS_BY_DAY='''SELECT day_of_week, ROUND(SUM(ms_played) / 3600000.00, 2) as hours_played
+                FROM dim_date d INNER JOIN fact_play_event f ON d.dim_date_key=f.date_key
+                GROUP BY day_of_week'''
+
+LISTENING_STREAK='''
+WITH plays AS (
+    SELECT DISTINCT track_name,artist_name, full_date
+    FROM dim_track t 
+    INNER JOIN fact_play_event f ON t.track_key = f.track_key 
+    INNER JOIN dim_date d ON f.date_key = d.dim_date_key
+    INNER JOIN dim_artist a ON f.artist_key = a.artist_key
+),
+counts AS (
+    SELECT track_name, artist_name, full_date, 
+        ROW_NUMBER() OVER (PARTITION BY track_name, artist_name ORDER BY full_date ASC) AS rn
+    FROM plays
+),
+streak_groups AS (
+    SELECT track_name, artist_name, full_date, rn, 
+        full_date - CAST(rn AS INTEGER) AS day_diff
+    FROM counts
+),
+streaks AS (
+    SELECT track_name, artist_name, day_diff, COUNT(*) AS streak
+    FROM streak_groups
+    GROUP BY track_name, artist_name, day_diff
+)
+SELECT track_name, artist_name, MAX(streak) AS longest_streak_of_days
+FROM streaks
+GROUP BY track_name, artist_name
+ORDER BY longest_streak_of_days DESC'''
