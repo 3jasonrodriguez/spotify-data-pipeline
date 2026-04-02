@@ -5,3 +5,4 @@ data/raw/streaming_history
 pipeline.log
 config.yaml
 logs/
+docker-compose.yaml
