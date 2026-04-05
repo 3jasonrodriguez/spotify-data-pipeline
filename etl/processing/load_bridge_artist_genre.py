@@ -61,10 +61,8 @@ def load_bridge_artist_genre():
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-        #Rollback on failure
-        conn.rollback()
-
-
+        if conn:
+         conn.rollback()
 def main():
     l = load_bridge_artist_genre()
 if __name__ == "__main__":

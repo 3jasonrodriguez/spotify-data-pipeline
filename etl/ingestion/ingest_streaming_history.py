@@ -40,6 +40,13 @@ def ingest_streaming_history():
                     records_dict_year[year].append(filtered_record)
                 else:
                     records_dict_year[year] = [filtered_record]
+    # Upload year by year and clear from memory
+    for year, records in records_dict_year.items():
+        logger.info(f"Uploading {len(records)} records for year {year}")
+        load_to_s3(records, "streaming_history", year=year)
+        records_dict_year[year] = []  # clear from memory after upload
+    
+    logger.info("Streaming history ingestion complete")
     return records_dict_year
             
 def main():

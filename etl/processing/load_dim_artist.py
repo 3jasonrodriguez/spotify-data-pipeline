@@ -42,7 +42,7 @@ def load_dim_artist():
                 execute_values(
                     cursor,
                     "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (artist_name) DO NOTHING",
-                    [(artist[0],artist[1]) for artist in artist_set]
+                    [(artist[0] if artist[0] else None, artist[1]) for artist in artist_set]
                 )
                 #Grab table row count after the insert for comparison
                 cursor.execute("SELECT count(*) from dim_artist")
@@ -52,9 +52,11 @@ def load_dim_artist():
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-        #Rollback on failure
-        conn.rollback()
-
+        if conn:
+         conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 def main():
     l = load_dim_artist()
 if __name__ == "__main__":

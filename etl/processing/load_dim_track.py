@@ -53,7 +53,9 @@ def load_dim_track():
                 #Parameterize the genres into the insert commands
                 execute_values(
                     cursor,
-                    "INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO NOTHING",
+                    """INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO UPDATE 
+                        SET duration_ms = EXCLUDED.duration_ms 
+                        WHERE dim_track.duration_ms IS NULL""",
                     [(track[0], track[1], track[2]) for track in tracks_set]
                 )
                 #Grab table row count after the insert for comparison
@@ -64,9 +66,12 @@ def load_dim_track():
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-        #Rollback on failure
-        conn.rollback()
-
+        if conn:
+            #Rollback on failure
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 def main():
     l = load_dim_track()
 if __name__ == "__main__":

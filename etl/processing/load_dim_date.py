@@ -63,9 +63,12 @@ def load_dim_date():
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-        #Rollback on failure
-        conn.rollback()
-
+        if conn:
+            #Rollback on failure
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 def main():
     l = load_dim_date()
 if __name__ == "__main__":

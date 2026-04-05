@@ -25,7 +25,7 @@ default_args = {
 with DAG(
     dag_id='spotify_pipeline',
     default_args=default_args,
-    start_date=datetime(2026, 4, 15),
+    start_date=datetime(2026, 1, 1),
     schedule='0 6 * * *',  # daily at 6am
     catchup=False
 ) as dag:

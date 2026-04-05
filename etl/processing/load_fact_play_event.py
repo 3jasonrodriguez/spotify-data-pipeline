@@ -53,6 +53,7 @@ def load_fact_play_event():
                 artist_mapping = {row[0]: row[1] for row in cursor.fetchall()}
                 valid_rows = [(date_mapping.get(row.full_date_hour),track_mapping.get(row.track_id),artist_mapping.get(row.artist_name), row.ms_played) for row in df.itertuples(index=False) 
                               if date_mapping.get(row.full_date_hour) and track_mapping.get(row.track_id) and artist_mapping.get(row.artist_name)]
+                logger.info(f"Valid rows: {len(valid_rows)} out of {len(fact_list)} total")
                 #Truncate the table daily. Helps prevent duplicates and keeps fresh data
                 cursor.execute("TRUNCATE TABLE fact_play_event")
                 #Parameterize the keys, ids, added_at into the insert commands
@@ -68,9 +69,12 @@ def load_fact_play_event():
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-        #Rollback on failure
-        conn.rollback()
-
+        if conn:
+            #Rollback on failure
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 def main():
     l = load_fact_play_event()
 if __name__ == "__main__":

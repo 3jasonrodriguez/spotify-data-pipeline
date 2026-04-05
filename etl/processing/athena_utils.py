@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError 
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from etl.utils.connections import get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 #Pass the string parameter into this function to execute the Athena query and return the results
@@ -33,6 +33,9 @@ def run_athena_query(query):
                 #Query failure and break
                 if status == "FAILED":
                     logger.error(f"Query failed: {athena_client.get_query_execution(QueryExecutionId=execution_id)['QueryExecution']['Status']['StateChangeReason']}")
+                    return None
+                elif status == "CANCELLED":
+                    logger.warning(f"Query was cancelled: {execution_id}")
                     return None
                 break
             time.sleep(1)

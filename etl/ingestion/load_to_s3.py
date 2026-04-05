@@ -5,9 +5,7 @@ from datetime import datetime
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
-from etl.ingestion.get_artists_genres import get_artists_genres
-from etl.ingestion.get_saved_tracks import get_saved_tracks
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from etl.utils.connections import get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -54,12 +52,6 @@ def load_to_s3(results_list, entity_type, year=None):
 
 
 def main():
-    #genre_list = ["prog rock", "progressive rock", "math rock"]
-    #searches = spotify_searches(genre_list, "playlist", 10)
-    #load_to_s3(searches, "playlists")
-    saved_tracks = get_saved_tracks()
-    load_to_s3(saved_tracks, "saved_tracks")
-    art_genres = get_artists_genres()
-    load_to_s3(art_genres, "artists")
+    logger.info("Running load to S3")
 if __name__ == "__main__":
     main()

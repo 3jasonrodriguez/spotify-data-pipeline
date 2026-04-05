@@ -9,6 +9,7 @@ import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError   
 from difflib import SequenceMatcher
+from etl.ingestion.load_to_s3 import load_to_s3
 from etl.utils.connections import get_spotify_credentials, get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
@@ -115,20 +116,24 @@ def get_artists_genres():
         dt = f"{year}{month}{day}"
         part_list.append(dt)
     #Grab latest partition and make it a datetime object to parse out the year/month/day
-    latest_part = max(part_list)
-    logger.debug(latest_part)
-    existing_artists_file = None
-    try:
-        existing_artists_file = s3_client.get_object(
-            Bucket=os.getenv("S3_BUCKET_NAME"),
-            Key = f"raw/artists/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/artists.jsonl"
-        )
-    except NoCredentialsError:
-        logger.error("AWS credentials not found - check your .env file")
-        return
-    except ClientError as e:
-        logger.error(f"S3 data pull failed: {e}")
-        pass
+    if not part_list:
+            logger.warning("No existing artists partitions found, will enrich all artists")
+            existing_artists_file = None
+    else:
+        latest_part = max(part_list)
+        logger.debug(latest_part)
+        existing_artists_file = None
+        try:
+            existing_artists_file = s3_client.get_object(
+                Bucket=os.getenv("S3_BUCKET_NAME"),
+                Key = f"raw/artists/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/artists.jsonl"
+            )
+        except NoCredentialsError:
+            logger.error("AWS credentials not found - check your .env file")
+            return
+        except ClientError as e:
+            logger.error(f"S3 data pull failed: {e}")
+            pass
     #Check if the call for the latest partition succeeds
     if existing_artists_file:
         existing_artists_contents = existing_artists_file["Body"].read().decode("utf-8")
@@ -187,6 +192,7 @@ def get_artists_genres():
     #Merge all artists after enriching them with the existing enriched artists
     logger.debug(f"Processed enriching {len(unenriched_artists)} with tags/genres")
     all_artists = {**existing_artists_dict, **unenriched_artists}
+    load_to_s3(list(all_artists.values()), "artists")
     return list(all_artists.values())
 def main():
     a = get_artists_genres()
