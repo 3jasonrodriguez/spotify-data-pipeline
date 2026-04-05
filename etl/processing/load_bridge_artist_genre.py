@@ -63,6 +63,9 @@ def load_bridge_artist_genre():
         logger.error(f"Postgres error: {e}")
         if conn:
          conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 def main():
     l = load_bridge_artist_genre()
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import sql.streamlit_queries as streamlit_queries
-from etl.utils.connections import get_spotify_credentials, get_postgres_conn
+from etl.utils.streamlit_connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -132,53 +132,49 @@ def library_adds(conn):
     query = streamlit_queries.LIBRARY_ADDS
     df = pd.read_sql(query, conn)
     st.header("My Library Growth")
-    #Aggregate the hours played by date
+    
     saved_dates = df.groupby("saved_at").size().reset_index(name="count")
-    #Define the selection on click for a date
-    click = alt.selection_point(fields=['saved_at'])
-    # Create the base altair bar chart for all plays
-    scatter = alt.Chart(saved_dates).mark_circles(size=60).encode(
+    
+    brush = alt.selection_interval(encodings=['x'])
+    
+    area = alt.Chart(saved_dates).mark_area(
+        line={'color': '#BF40BF'},
+        color=alt.Gradient(
+            gradient='linear',
+            stops=[
+                alt.GradientStop(color='white', offset=0),
+                alt.GradientStop(color='#BF40BF', offset=1)
+            ],
+            x1=1, x2=1, y1=1, y2=0
+        )
+    ).encode(
         x="saved_at:T",
         y="count:Q",
-        color=alt.condition(
-            click,
-            alt.value('#BF40BF'),  # Selected bar color
-            alt.value('darkgray') # Unselected bar color
-        )
-    ).add_params(
-            click
-    )
+        tooltip=["saved_at:T", "count:Q"],
+        opacity=alt.condition(brush, alt.value(1), alt.value(0.3))
+    ).add_params(brush)
     
-    #Display the chart in Streamlit and capture selections
-    selected_plot = st.altair_chart(scatter, on_select="rerun")
-    if selected_plot and 'selection' in selected_plot:
-        #Grab the selected portion of data to parse
-        selection = selected_plot['selection']
-        if selection:
-            #For drill down table
+    selected_plot = st.altair_chart(area, on_select="rerun")
+    
+    if selected_plot and selected_plot.get('selection', {}).get('param_1'):
+        selected = selected_plot['selection']['param_1']
+        if 'saved_at' in selected:
+            date_range = selected['saved_at']
+            start = pd.to_datetime(date_range[0], unit='ms')
+            end = pd.to_datetime(date_range[1], unit='ms')
+            df['saved_at'] = pd.to_datetime(df['saved_at'])
+            filtered_df = df[(df['saved_at'] >= start) & (df['saved_at'] <= end)]
             st.subheader("Library Addition Details:")
-            #Parse the selection to grab the selected dates
-            point_selections = [selection[ps] for ps in selection]
-            st.write(point_selections)
-            '''filtered_dates = []
-            for obj in point_selections:
-                for attrs in obj:
-                    for att in attrs:
-                        if att == "full_date":
-                            #Convert timestamp back to date
-                            ts_ms = attrs[att]
-                            converted_date = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).date()
-                            #Account for multiple dates selected in the bar chart
-                            filtered_dates.append(converted_date)
-            #Filter the dataframe by the selected dates
-            filtered_dates_df = df[df["full_date"].isin(filtered_dates)]
-            #Show minutes played per song instead of hours
-            #Copy before modifying
-            filtered_df = filtered_dates_df.copy()
-            filtered_df["minutes_played"] = filtered_df["hours_played"] * 60
-            filtered_df = filtered_df.drop(columns=['hours_played'])
-            #Display the drill down table with filtered data
-            st.dataframe(filtered_df, hide_index=True)'''
+            st.dataframe(
+                filtered_df[['track_name', 'artist_name', 'saved_at']],
+                column_config={
+                    "track_name": st.column_config.TextColumn("Track"),
+                    "artist_name": st.column_config.TextColumn("Artist"),
+                    "saved_at": st.column_config.DateColumn("Date Added", format="MMM DD, YYYY")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
 
 
 
@@ -193,6 +189,7 @@ def app():
             st.title("My Spotify Analytics")
             date_streams(conn)
             genre_trends(conn)
+            library_adds(conn)
             listening_streaks(conn)
             streams_by_day(conn)
             top_ten_songs(conn)

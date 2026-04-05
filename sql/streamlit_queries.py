@@ -63,7 +63,7 @@ FROM streaks
 GROUP BY track_name, artist_name
 ORDER BY longest_streak_of_days DESC'''
 
-LIBRARY_ADDS='''SELECT artist_name, track_name, DATE(saved_at) as saved_at
+LIBRARY_ADDS='''SELECT distinct artist_name, track_name, DATE(saved_at) as saved_at
             FROM dim_library l INNER JOIN dim_track t ON l.track_key=t.track_key
             INNER JOIN fact_play_event f ON t.track_key=f.track_key
             INNER JOIN dim_artist a ON f.artist_key=a.artist_key

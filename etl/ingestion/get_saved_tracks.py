@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
 import math
+from etl.ingestion.load_to_s3 import load_to_s3
 from etl.utils.spotify_auth import get_spotify_access_token
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from etl.utils.connections import get_aws_client
 import requests
 from requests.exceptions import RequestException, HTTPError
 from etl.utils.logger import get_logger 
@@ -74,8 +75,9 @@ def get_saved_tracks():
             logger.error("Invalid JSON response")
             saved_url = None
             break
-    logger.debug(f"Retrieved {len(saved_list)} saved tracks")
-    return saved_list
+    logger.debug(f"Retrieved {len(saved_list)} saved tracks") 
+    load_to_s3(saved_list, "saved_tracks")
+
 
 def main():
     s = get_saved_tracks()
