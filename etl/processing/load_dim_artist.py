@@ -3,7 +3,7 @@ import os
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
-import logging
+from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -20,7 +20,7 @@ def load_dim_artist():
     #Run athena query
     rows = run_athena_query(artist_query)
     if not rows:
-        logging.warning(f"No rows returned from the athena query: {artist_query}")
+        logger.warning(f"No rows returned from the athena query: {artist_query}")
         return
     artist_set = set()
     #iterate over each row after the headers
@@ -32,13 +32,7 @@ def load_dim_artist():
     conn = None
     try:
         #Open postgres connection
-        with psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST"),
-            port=os.getenv("POSTGRES_PORT"),
-            dbname=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD")
-        ) as conn:
+        with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 #Grab the table row count so we can compare after the insert
                 #We are doing the count of inserted records this way because cursor.rowcount is not consistent
@@ -54,10 +48,10 @@ def load_dim_artist():
                 cursor.execute("SELECT count(*) from dim_artist")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                logging.info(f"Inserted {diff_row_count} new records into dim_artist")
+                logger.info(f"Inserted {diff_row_count} new records into dim_artist")
             conn.commit()
     except psycopg2.Error as e:
-        logging.error(f"Postgres error: {e}")
+        logger.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

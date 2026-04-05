@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import sql.streamlit_queries as streamlit_queries
-import logging
+from etl.utils.connections import get_spotify_credentials, get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -127,18 +127,67 @@ def date_streams(conn):
             filtered_df = filtered_df.drop(columns=['hours_played'])
             #Display the drill down table with filtered data
             st.dataframe(filtered_df, hide_index=True)
+
+def library_adds(conn):
+    query = streamlit_queries.LIBRARY_ADDS
+    df = pd.read_sql(query, conn)
+    st.header("My Library Growth")
+    #Aggregate the hours played by date
+    saved_dates = df.groupby("saved_at").size().reset_index(name="count")
+    #Define the selection on click for a date
+    click = alt.selection_point(fields=['saved_at'])
+    # Create the base altair bar chart for all plays
+    scatter = alt.Chart(saved_dates).mark_circles(size=60).encode(
+        x="saved_at:T",
+        y="count:Q",
+        color=alt.condition(
+            click,
+            alt.value('#BF40BF'),  # Selected bar color
+            alt.value('darkgray') # Unselected bar color
+        )
+    ).add_params(
+            click
+    )
+    
+    #Display the chart in Streamlit and capture selections
+    selected_plot = st.altair_chart(scatter, on_select="rerun")
+    if selected_plot and 'selection' in selected_plot:
+        #Grab the selected portion of data to parse
+        selection = selected_plot['selection']
+        if selection:
+            #For drill down table
+            st.subheader("Library Addition Details:")
+            #Parse the selection to grab the selected dates
+            point_selections = [selection[ps] for ps in selection]
+            st.write(point_selections)
+            '''filtered_dates = []
+            for obj in point_selections:
+                for attrs in obj:
+                    for att in attrs:
+                        if att == "full_date":
+                            #Convert timestamp back to date
+                            ts_ms = attrs[att]
+                            converted_date = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).date()
+                            #Account for multiple dates selected in the bar chart
+                            filtered_dates.append(converted_date)
+            #Filter the dataframe by the selected dates
+            filtered_dates_df = df[df["full_date"].isin(filtered_dates)]
+            #Show minutes played per song instead of hours
+            #Copy before modifying
+            filtered_df = filtered_dates_df.copy()
+            filtered_df["minutes_played"] = filtered_df["hours_played"] * 60
+            filtered_df = filtered_df.drop(columns=['hours_played'])
+            #Display the drill down table with filtered data
+            st.dataframe(filtered_df, hide_index=True)'''
+
+
+
 def app():
     load_dotenv()
     conn = None
     try:
         #Open postgres connection
-        with psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST"),
-            port=os.getenv("POSTGRES_PORT"),
-            dbname=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD")
-        ) as conn:
+        with get_postgres_conn() as conn:
             #Render the Visualizations
             st.set_page_config(layout="wide")
             st.title("My Spotify Analytics")
@@ -151,7 +200,7 @@ def app():
             artists_wordcloud(conn)
 
     except psycopg2.Error as e:
-        logging.error(f"Database error: {e}")
+        logger.error(f"Database error: {e}")
         st.error(f"Database error: {e}")
         if conn:
             conn.rollback()

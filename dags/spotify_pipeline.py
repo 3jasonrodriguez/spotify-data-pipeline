@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
+from etl.utils.connections import get_spotify_credentials, get_aws_client
 from datetime import datetime, timedelta
 from etl.ingestion.get_artists_genres import get_artists_genres
 from etl.ingestion.get_saved_tracks import get_saved_tracks
@@ -76,5 +77,4 @@ with DAG(
 
     [load_dim_genre_task, load_dim_artist_task, load_dim_track_task, load_dim_date_task] >> load_dim_library_task
     [load_dim_genre_task, load_dim_artist_task, load_dim_track_task, load_dim_date_task] >> load_bridge_artist_genre_task
-
     [load_dim_library_task, load_bridge_artist_genre_task] >> load_fact_play_event_task

@@ -4,7 +4,7 @@ from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
 import pandas as pd
-import logging
+from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -15,7 +15,7 @@ def load_dim_library():
     #Run athena query
     rows = run_athena_query(lib_query)
     if not rows:
-        logging.warning(f"No rows returned from the athena query: {lib_query}")
+        logger.warning(f"No rows returned from the athena query: {lib_query}")
         return
     library_set = set()
     #iterate over each row after the headers
@@ -30,13 +30,7 @@ def load_dim_library():
     conn = None
     try:
         #Open postgres connection
-        with psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST"),
-            port=os.getenv("POSTGRES_PORT"),
-            dbname=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD")
-        ) as conn:
+        with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 #Grab mapping of track ids and track keys
                 cursor.execute("SELECT spotify_track_id, track_key FROM dim_track")
@@ -53,10 +47,10 @@ def load_dim_library():
                 #Grab table row count after the insert for comparison
                 cursor.execute("SELECT count(*) from dim_library")
                 row_count_after = int(cursor.fetchall()[0][0])
-                logging.info(f"Inserted {row_count_after} records into dim_library")
+                logger.info(f"Inserted {row_count_after} records into dim_library")
             conn.commit()
     except psycopg2.Error as e:
-        logging.error(f"Postgres error: {e}")
+        logger.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

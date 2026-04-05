@@ -3,6 +3,7 @@ import os
 import json 
 from datetime import datetime
 from etl.ingestion.load_to_s3 import load_to_s3
+from etl.utils.connections import get_spotify_credentials, get_aws_client
 import logging
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)

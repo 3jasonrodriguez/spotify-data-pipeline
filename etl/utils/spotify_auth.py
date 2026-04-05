@@ -4,7 +4,7 @@ import json
 from dotenv import load_dotenv
 from requests.exceptions import RequestException, HTTPError
 from urllib.parse import urlencode
-import logging
+from etl.utils.connections import get_spotify_credentials
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -38,33 +38,33 @@ def exchange_code_for_tokens(code):
         data = token_response.json()
         refresh_token = data.get('refresh_token')
     except HTTPError as e:
-        logging.error(f"HTTP error: {e.token_response['status_code']}")
+        logger.error(f"HTTP error: {e.token_response['status_code']}")
     except RequestException as e:
-        logging.error(f"Connection error: {e}")
+        logger.error(f"Connection error: {e}")
     except ValueError:
-        logging.error("Invalid JSON response")
+        logger.error("Invalid JSON response")
     return None
 
 
 def get_spotify_access_token ():
 
     #load variables from .env file
-    load_dotenv()
+    creds = get_spotify_credentials()
     auth_url = "https://accounts.spotify.com/api/token"
     payload = {
         'grant_type': 'refresh_token',
-        'refresh_token':os.getenv("SPOTIFY_REFRESH_TOKEN"),
+        'refresh_token':creds["refresh_token"],
     }
         #Try catch for grabbing an access token with exception handling
     try:
-        token_response = requests.post(auth_url, data=payload, auth=(os.getenv("SPOTIFY_CLIENT_ID"), os.getenv("SPOTIFY_CLIENT_SECRET")))
+        token_response = requests.post(auth_url, data=payload, auth=(creds["client_id"], creds["client_secret"]))
         data = token_response.json()
         access_token = data.get('access_token')
         return access_token
     except HTTPError as e:
-        logging.error(f"HTTP error: {e.token_response['status_code']}")
+        logger.error(f"HTTP error: {e.token_response['status_code']}")
     except RequestException as e:
-        logging.error(f"Connection error: {e}")
+        logger.error(f"Connection error: {e}")
     except ValueError:
-        logging.error("Invalid JSON response")
+        logger.error("Invalid JSON response")
     return None

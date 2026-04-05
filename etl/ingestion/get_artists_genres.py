@@ -9,7 +9,7 @@ import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError   
 from difflib import SequenceMatcher
-import logging
+from etl.utils.connections import get_spotify_credentials, get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -19,30 +19,25 @@ def names_match(name1, name2, threshold=0.8):
 
 def get_artists_genres():
     load_dotenv()
+    s3_client = get_aws_client("s3")
      ###########################################################  
     # Grab the latest saved tracks partition to find the artists
     ############################################################  
     #Using creds to for s3 client connect
-    client = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION")
-    )
     #Grabbing latest partition in S3
     try:
-        partitions = client.list_objects_v2(
+        partitions = s3_client.list_objects_v2(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Prefix="raw/saved_tracks/",
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
     #Grab S3 contents containing the keys within the prefix
     partition_contents = partitions.get("Contents", [])
     if not partition_contents:
-        logging.warning("No partitions found in S3")
+        logger.warning("No partitions found in S3")
         return
    #Used to grab all yyyymmdd extracted values to determine the latest
     part_list = []
@@ -58,15 +53,15 @@ def get_artists_genres():
     latest_part = max(part_list)
     tracks_file = None
     try:
-        tracks_file = client.get_object(
+        tracks_file = s3_client.get_object(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Key = f"raw/saved_tracks/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/saved_tracks.jsonl"
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
         return
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
         return
     #Contents from s3 pull
     tracks_contents = tracks_file["Body"].read().decode("utf-8")
@@ -84,10 +79,10 @@ def get_artists_genres():
         else:
             #Only one artist for the track
             artists_list.append(artists)
-    logging.debug(f"count in artists list: {len(artists_list)}")
+    logger.debug(f"count in artists list: {len(artists_list)}")
     #Dedup the list of artists by making into a dictionary
     unique_artists = {result['id']:result for result in artists_list if result and result.get('id')}
-    logging.info(f"count of unique artists: {len(unique_artists)}")
+    logger.info(f"count of unique artists: {len(unique_artists)}")
     #######################################################################################  
     # Look for already tagged/genre enriched artists to save calls to the musicbrainz api.
     # This is too improve performance rather than making calls for all artists
@@ -96,18 +91,18 @@ def get_artists_genres():
     existing_artists_dict = {}    
     #Grabbing latest partition in S3 for artists to find artists that already have genres
     try:
-        partitions = client.list_objects_v2(
+        partitions = s3_client.list_objects_v2(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Prefix="raw/artists/",
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
     #Grab S3 contents containing the keys within the prefix
     partition_contents = partitions.get("Contents", [])
     if not partition_contents:
-        logging.warning("No partitions found in S3")
+        logger.warning("No partitions found in S3")
         pass
    #Used to grab all yyyymmdd extracted values to determine the latest
     part_list = []
@@ -121,18 +116,18 @@ def get_artists_genres():
         part_list.append(dt)
     #Grab latest partition and make it a datetime object to parse out the year/month/day
     latest_part = max(part_list)
-    print(latest_part)
+    logger.debug(latest_part)
     existing_artists_file = None
     try:
-        existing_artists_file = client.get_object(
+        existing_artists_file = s3_client.get_object(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Key = f"raw/artists/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/artists.jsonl"
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
         return
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
         pass
     #Check if the call for the latest partition succeeds
     if existing_artists_file:
@@ -151,7 +146,7 @@ def get_artists_genres():
         #Make the tags attribute empty if no tags are found as a match
         unenriched_artists[a]['tags'] = []
         name = unenriched_artists[a].get('name')
-        print(f"Enriching {name}")
+        logger.debug(f"Enriching {name}")
         musicbrainz_url = f"https://musicbrainz.org/ws/2/artist"
         headers = {
             "User-Agent": f"spotify-data-pipeline/1.0 (3jasonrodriguez@gmail.com)",
@@ -179,19 +174,19 @@ def get_artists_genres():
                     #for a matching artist name, add a tags array for all matched genre tags from musicbrainz
                     unenriched_artists[a]['tags'] = [ tag.get('name') for tag in matched_artist.get('tags', [])]
         except HTTPError as e:
-            logging.error(f"HTTP Error: {e}")
+            logger.error(f"HTTP Error: {e}")
             continue
         except RequestException as e:
-            logging.error(f"Request failed: {e}")
+            logger.error(f"Request failed: {e}")
             time.sleep(5)
             continue
         #JSON parsing errors
         except (ValueError, KeyError) as e:
-            logging.error(f"Failed to parse JSON for items for artist id:'{id}': {e}")
+            logger.error(f"Failed to parse JSON for items for artist id:'{id}': {e}")
             continue
     #Merge all artists after enriching them with the existing enriched artists
-    logging.debug(f"Processed enriching {len(unenriched_artists)} with tags/genres")
-    all_artists = unenriched_artists | existing_artists_dict
+    logger.debug(f"Processed enriching {len(unenriched_artists)} with tags/genres")
+    all_artists = {**existing_artists_dict, **unenriched_artists}
     return list(all_artists.values())
 def main():
     a = get_artists_genres()

@@ -4,7 +4,7 @@ import pandas as pd
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 from etl.processing.athena_utils import run_athena_query
-import logging
+from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -21,7 +21,7 @@ def load_fact_play_event():
     #Run athena query
     rows = run_athena_query(fact_query)
     if not rows:
-        logging.warning(f"No rows returned from the athena query: {fact_query}")
+        logger.warning(f"No rows returned from the athena query: {fact_query}")
         return
     fact_list = []
     #iterate over each row after the headers
@@ -40,13 +40,7 @@ def load_fact_play_event():
     conn = None
     try:
         #Open postgres connection
-        with psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST"),
-            port=os.getenv("POSTGRES_PORT"),
-            dbname=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD")
-        ) as conn:
+        with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 #Grab mapping of composite date and hour for dim date keys
                 cursor.execute("SELECT CAST(full_date AS VARCHAR) || '_' || CAST (hour AS VARCHAR) AS full_date_hour, dim_date_key FROM dim_date")
@@ -70,10 +64,10 @@ def load_fact_play_event():
                 #Grab table row count after the insert for comparison
                 cursor.execute("SELECT count(*) from fact_play_event")
                 row_count_after = int(cursor.fetchall()[0][0])
-                logging.info(f"Inserted {row_count_after} records into fact_play_event")
+                logger.info(f"Inserted {row_count_after} records into fact_play_event")
             conn.commit()
     except psycopg2.Error as e:
-        logging.error(f"Postgres error: {e}")
+        logger.error(f"Postgres error: {e}")
         #Rollback on failure
         conn.rollback()
 

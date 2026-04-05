@@ -7,14 +7,14 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
 from etl.ingestion.get_artists_genres import get_artists_genres
 from etl.ingestion.get_saved_tracks import get_saved_tracks
-import logging
+from etl.utils.connections import get_spotify_credentials, get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
 #Load playlists seacrh results to s3
 def load_to_s3(results_list, entity_type, year=None):
     if not results_list:
-        logging.warning(f"No records to load for {entity_type}")
+        logger.warning(f"No records to load for {entity_type}")
         return
     #Load .env
     load_dotenv()
@@ -38,24 +38,19 @@ def load_to_s3(results_list, entity_type, year=None):
     #join resulting lines to jsonl string
     jsonl_string = "\n".join(lines)
     #Using creds to for s3 client connect
-    client = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION")
-    )
+    s3_client = get_aws_client("s3")
     #Placing object to s3 bucket
     try:
-        client.put_object(
+        s3_client.put_object(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Key=s3_key,
             Body=jsonl_string.encode("utf-8") # S3 expects bytes, so the jsonl string has to be encoded
         )
-        logging.info(f"{s3_key} loaded to S3")
+        logger.info(f"{s3_key} loaded to S3")
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        logging.error(f"{s3_key} upload failed: {e}")
+        logger.error(f"{s3_key} upload failed: {e}")
 
 
 def main():

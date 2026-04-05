@@ -3,38 +3,33 @@ import json
 from dotenv import load_dotenv
 from datetime import datetime
 from etl.utils.spotify_auth import get_spotify_access_token
+from etl.utils.connections import get_spotify_credentials, get_aws_client
 import requests
 from requests.exceptions import RequestException, HTTPError
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError
-import logging
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
 def get_playlist_tracks():
     load_dotenv()
     #Using creds to for s3 client connect
-    client = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        region_name=os.getenv("AWS_REGION")
-    )
+    s3_client = get_aws_client("s3")
     #Grabbing latest partition in S3
     try:
-        partitions = client.list_objects_v2(
+        partitions = s3_client.list_objects_v2(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Prefix="raw/playlist/",
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
     #Grab S3 contents containing the keys within the prefix
     partition_contents = partitions.get("Contents", [])
     if not partition_contents:
-        logging.warning("No partitions found in S3")
+        logger.warning("No partitions found in S3")
         return
    #Used to grab all yyyymmdd extracted values to determine the latest
     part_list = []
@@ -49,14 +44,14 @@ def get_playlist_tracks():
     #Grab latest partition and make it a datetime object to parse out the year/month/day
     latest_part = max(part_list)
     try:
-        playlist_file = client.get_object(
+        playlist_file = s3_client.get_object(
             Bucket=os.getenv("S3_BUCKET_NAME"),
             Key = f"raw/playlist/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/playlist.jsonl"
         )
     except NoCredentialsError:
-        logging.error("AWS credentials not found - check your .env file")
+        logger.error("AWS credentials not found - check your .env file")
     except ClientError as e:
-        logging.error(f"S3 data pull failed: {e}")
+        logger.error(f"S3 data pull failed: {e}")
     #Contents from s3 pull
     playlists_contents = playlist_file["Body"].read().decode("utf-8")
     #Splits the jsonl string into a list of lines, removes trailing newlines, skips empty lines, parses each line into a dict 
@@ -82,14 +77,14 @@ def get_playlist_tracks():
             items_response.raise_for_status()
             data = items_response.json()
         except HTTPError as e:
-            logging.error(f"HTTP Error: {e}")
+            logger.error(f"HTTP Error: {e}")
             continue
         except RequestException as e:
-            logging.error(f"Request failed: {e}")
+            logger.error(f"Request failed: {e}")
             continue
         #JSON parsing errors
         except (ValueError, KeyError) as e:
-            logging.error(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
+            logger.error(f"Failed to parse JSON for items for playlist id:'{id}': {e}")
             continue    
 def main():
     playlist_tracks = get_playlist_tracks()
