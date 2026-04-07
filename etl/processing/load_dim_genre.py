@@ -7,9 +7,12 @@ from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def load_dim_genre():
+def load_dim_genre(user="jason"):
     load_dotenv()
-    genre_query = "SELECT DISTINCT tag FROM artists CROSS JOIN UNNEST(tags) AS t(tag) WHERE tag IS NOT NULL"
+    genre_query = f"""SELECT DISTINCT tag 
+                FROM artists 
+                CROSS JOIN UNNEST(tags) AS t(tag) 
+                WHERE tag IS NOT NULL AND user='{user}'"""
     #Run athena query
     rows = run_athena_query(genre_query)
     if not rows:
@@ -28,19 +31,19 @@ def load_dim_genre():
             with conn.cursor() as cursor:
                 #Grab the table row count so we can compare after the insert
                 #We are doing the count of inserted records this way because cursor.rowcount is not consistent
-                cursor.execute("SELECT count(*) from dim_genre")
+                cursor.execute(f"SELECT count(*) from {user}.dim_genre")
                 row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
                 execute_values(
                     cursor,
-                    "INSERT INTO dim_genre (genre_name) VALUES %s ON CONFLICT (genre_name) DO NOTHING",
+                    f"INSERT INTO {user}.dim_genre (genre_name) VALUES %s ON CONFLICT (genre_name) DO NOTHING",
                     [(genre,) for genre in genre_set]
                 )
                 #Grab table row count after the insert for comparison
-                cursor.execute("SELECT count(*) from dim_genre")
+                cursor.execute(f"SELECT count(*) from {user}.dim_genre")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                logger.info(f"Inserted {diff_row_count} new records into dim_genre")
+                logger.info(f"Inserted {diff_row_count} new records into {user}.dim_genre")
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
@@ -51,6 +54,8 @@ def load_dim_genre():
         if conn:
             conn.close()
 def main():
-    l = load_dim_genre()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    load_dim_genre(user=user)
 if __name__ == "__main__":
     main()

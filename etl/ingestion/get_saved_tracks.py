@@ -10,7 +10,7 @@ from etl.utils.logger import get_logger
 logger = get_logger(__name__)
 
 #Get all saved tracks  in the user library
-def get_saved_tracks():
+def get_saved_tracks(user="jason"):
     load_dotenv()
     #Grab token
     token = get_spotify_access_token()
@@ -76,10 +76,12 @@ def get_saved_tracks():
             saved_url = None
             break
     logger.debug(f"Retrieved {len(saved_list)} saved tracks") 
-    load_to_s3(saved_list, "saved_tracks")
+    load_to_s3(saved_list, "saved_tracks",user)
 
 
 def main():
-    s = get_saved_tracks()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    get_saved_tracks(user=user)
 if __name__ == "__main__":
     main()

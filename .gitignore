@@ -1,7 +1,7 @@
 venv/
 __pycache__/
 .env
-data/raw/streaming_history
+data/raw/
 pipeline.log
 config.yaml
 logs/

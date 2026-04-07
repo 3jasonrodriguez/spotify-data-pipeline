@@ -7,15 +7,16 @@ from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def load_dim_track():
+def load_dim_track(user="jason"):
     load_dotenv()
-    tracks_query = """SELECT DISTINCT track_id, track_name, duration_ms FROM (
+    tracks_query = f"""SELECT DISTINCT track_id, track_name, duration_ms FROM (
         -- tracks from streaming history
         SELECT SUBSTR(spotify_track_uri, 15) as track_id, 
             master_metadata_track_name as track_name,
             NULL as duration_ms
         FROM streaming_history
         WHERE spotify_track_uri IS NOT NULL
+        AND user='{user}'
         
         UNION
         
@@ -24,6 +25,7 @@ def load_dim_track():
             track.name as track_name,
             track.duration_ms as duration_ms
         FROM saved_tracks
+        WHERE user='{user}'
     )
     WHERE track_id IS NOT NULL 
     AND track_name IS NOT NULL"""
@@ -48,21 +50,21 @@ def load_dim_track():
             with conn.cursor() as cursor:
                 #Grab the table row count so we can compare after the insert
                 #We are doing the count of inserted records this way because cursor.rowcount is not consistent
-                cursor.execute("SELECT count(*) from dim_track")
+                cursor.execute(f"SELECT count(*) from {user}.dim_track")
                 row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
                 execute_values(
                     cursor,
-                    """INSERT INTO dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO UPDATE 
+                    f"""INSERT INTO {user}.dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO UPDATE 
                         SET duration_ms = EXCLUDED.duration_ms 
                         WHERE dim_track.duration_ms IS NULL""",
                     [(track[0], track[1], track[2]) for track in tracks_set]
                 )
                 #Grab table row count after the insert for comparison
-                cursor.execute("SELECT count(*) from dim_track")
+                cursor.execute(f"SELECT count(*) from {user}.dim_track")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                logger.info(f"Inserted {diff_row_count} new records into dim_track")
+                logger.info(f"Inserted {diff_row_count} new records into {user}.dim_track")
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
@@ -73,6 +75,8 @@ def load_dim_track():
         if conn:
             conn.close()
 def main():
-    l = load_dim_track()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    load_dim_track(user=user)
 if __name__ == "__main__":
     main()

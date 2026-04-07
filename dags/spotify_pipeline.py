@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
+from airflow.models.param import Param
 from etl.utils.connections import get_spotify_credentials, get_aws_client
 from datetime import datetime, timedelta
 from etl.ingestion.get_artists_genres import get_artists_genres
@@ -14,8 +15,6 @@ from etl.processing.load_dim_library import load_dim_library
 from etl.processing.load_dim_track import load_dim_track
 from etl.processing.load_fact_play_event import load_fact_play_event
 
-
-
 default_args = {
     'owner': 'airflow',
     'retries': 3,
@@ -27,48 +26,61 @@ with DAG(
     default_args=default_args,
     start_date=datetime(2026, 1, 1),
     schedule='0 6 * * *',  # daily at 6am
-    catchup=False
+    catchup=False,
+    params={
+        "user": Param(default="jason", type="string")
+    }
 ) as dag:
     # tasks go here
     extract_saved_tracks_task = PythonOperator(
         task_id='extract_saved_tracks',
-        python_callable=get_saved_tracks
+        python_callable=get_saved_tracks,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     ingest_streaming_history_task = PythonOperator(
         task_id='ingest_streaming_history',
-        python_callable=ingest_streaming_history
+        python_callable=ingest_streaming_history,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     extract_artists_genres_task = PythonOperator(
         task_id='extract_artists_genres',
-        python_callable=get_artists_genres
+        python_callable=get_artists_genres,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_dim_genre_task = PythonOperator(
         task_id='load_dim_genre',
-        python_callable=load_dim_genre
+        python_callable=load_dim_genre,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_dim_track_task = PythonOperator(
         task_id='load_dim_track',
-        python_callable=load_dim_track
+        python_callable=load_dim_track,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_dim_artist_task = PythonOperator(
         task_id='load_dim_artist',
-        python_callable=load_dim_artist
+        python_callable=load_dim_artist,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_dim_date_task = PythonOperator(
         task_id='load_dim_date',
-        python_callable=load_dim_date
+        python_callable=load_dim_date,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_dim_library_task = PythonOperator(
         task_id='load_dim_library',
-        python_callable=load_dim_library
+        python_callable=load_dim_library,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_bridge_artist_genre_task = PythonOperator(
         task_id='load_bridge_artist_genre',
-        python_callable=load_bridge_artist_genre
+        python_callable=load_bridge_artist_genre,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     load_fact_play_event_task = PythonOperator(
         task_id='load_fact_play_event',
-        python_callable=load_fact_play_event
+        python_callable=load_fact_play_event,
+        op_kwargs={"user": "{{ params.user }}"}
     )
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_genre_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_artist_task

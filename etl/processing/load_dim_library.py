@@ -8,10 +8,11 @@ from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def load_dim_library():
+def load_dim_library(user="jason"):
     load_dotenv()
-    lib_query = """SELECT DISTINCT track.id, added_at
-    FROM saved_tracks"""
+    lib_query = f"""SELECT DISTINCT track.id, added_at
+    FROM saved_tracks
+    WHERE user='{user}'"""
     #Run athena query
     rows = run_athena_query(lib_query)
     if not rows:
@@ -33,21 +34,21 @@ def load_dim_library():
         with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 #Grab mapping of track ids and track keys
-                cursor.execute("SELECT spotify_track_id, track_key FROM dim_track")
+                cursor.execute(f"SELECT spotify_track_id, track_key {user}.FROM dim_track")
                 track_mapping = {row[0]: row[1] for row in cursor.fetchall()}
                 valid_rows = [(track_mapping.get(row.track_id), row.added_at) for row in df.itertuples(index=False) if track_mapping.get(row.track_id)]
                 #Truncate the table daily. Helps keep the library accurate with what is in the library daily
-                cursor.execute("TRUNCATE TABLE dim_library")                
+                cursor.execute(f"TRUNCATE TABLE {user}.dim_library")                
                 #Parameterize the keys, ids, added_at into the insert commands
                 execute_values(
                     cursor,
-                    "INSERT INTO dim_library (track_key, saved_at) VALUES %s ON CONFLICT (track_key) DO NOTHING",
+                    f"INSERT INTO {user}.dim_library (track_key, saved_at) VALUES %s ON CONFLICT (track_key) DO NOTHING",
                     [(r[0], r[1]) for r in valid_rows]
                 )
                 #Grab table row count after the insert for comparison
-                cursor.execute("SELECT count(*) from dim_library")
+                cursor.execute(f"SELECT count(*) from {user}.dim_library")
                 row_count_after = int(cursor.fetchall()[0][0])
-                logger.info(f"Inserted {row_count_after} records into dim_library")
+                logger.info(f"Inserted {row_count_after} records into {user}.dim_library")
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
@@ -59,6 +60,8 @@ def load_dim_library():
             conn.close()
 
 def main():
-    l = load_dim_library()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    load_dim_library(user=user)
 if __name__ == "__main__":
     main()

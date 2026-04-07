@@ -10,7 +10,7 @@ from etl.utils.logger import get_logger
 logger = get_logger(__name__)
 
 #Load playlists seacrh results to s3
-def load_to_s3(results_list, entity_type, year=None):
+def load_to_s3(results_list, entity_type, user, year=None):
     if not results_list:
         logger.warning(f"No records to load for {entity_type}")
         return
@@ -18,7 +18,7 @@ def load_to_s3(results_list, entity_type, year=None):
     load_dotenv()
     #If a year is sent (for streaming data), use the yearly partition
     if year:
-        s3_key = f"raw/{entity_type}/year={year}/{entity_type}.jsonl"
+        s3_key = f"raw/{entity_type}/user={user}/year={year}/{entity_type}.jsonl"
     else:
         #Build out the s3 key for todays date
         #Grab date partials to build out s3 bucket/partition structure
@@ -26,7 +26,7 @@ def load_to_s3(results_list, entity_type, year=None):
         yr = today.strftime("%Y")
         mo = today.strftime("%m")
         dy = today.strftime("%d")
-        s3_key = f"raw/{entity_type}/year={yr}/month={mo}/day={dy}/{entity_type}.jsonl"
+        s3_key = f"raw/{entity_type}/user={user}/year={yr}/month={mo}/day={dy}/{entity_type}.jsonl"
     #Iterate through each result dictionary
     #lines for loading JSONL to s3
     lines = []

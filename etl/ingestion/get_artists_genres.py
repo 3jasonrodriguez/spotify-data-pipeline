@@ -18,7 +18,7 @@ def names_match(name1, name2, threshold=0.8):
     ratio = SequenceMatcher(None, name1.lower(), name2.lower()).ratio()
     return ratio >= threshold
 
-def get_artists_genres():
+def get_artists_genres(user="jason"):
     load_dotenv()
     s3_client = get_aws_client("s3")
      ###########################################################  
@@ -29,7 +29,7 @@ def get_artists_genres():
     try:
         partitions = s3_client.list_objects_v2(
             Bucket=os.getenv("S3_BUCKET_NAME"),
-            Prefix="raw/saved_tracks/",
+            Prefix="raw/saved_tracks/user={user}/",
         )
     except NoCredentialsError:
         logger.error("AWS credentials not found - check your .env file")
@@ -56,7 +56,7 @@ def get_artists_genres():
     try:
         tracks_file = s3_client.get_object(
             Bucket=os.getenv("S3_BUCKET_NAME"),
-            Key = f"raw/saved_tracks/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/saved_tracks.jsonl"
+            Key = f"raw/saved_tracks/user={user}/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/saved_tracks.jsonl"
         )
     except NoCredentialsError:
         logger.error("AWS credentials not found - check your .env file")
@@ -94,7 +94,7 @@ def get_artists_genres():
     try:
         partitions = s3_client.list_objects_v2(
             Bucket=os.getenv("S3_BUCKET_NAME"),
-            Prefix="raw/artists/",
+            Prefix="raw/artists/user={user}/",
         )
     except NoCredentialsError:
         logger.error("AWS credentials not found - check your .env file")
@@ -126,7 +126,7 @@ def get_artists_genres():
         try:
             existing_artists_file = s3_client.get_object(
                 Bucket=os.getenv("S3_BUCKET_NAME"),
-                Key = f"raw/artists/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/artists.jsonl"
+                Key = f"raw/artists/user={user}/year={latest_part[:4]}/month={latest_part[4:6]}/day={latest_part[6:]}/artists.jsonl"
             )
         except NoCredentialsError:
             logger.error("AWS credentials not found - check your .env file")
@@ -192,9 +192,11 @@ def get_artists_genres():
     #Merge all artists after enriching them with the existing enriched artists
     logger.debug(f"Processed enriching {len(unenriched_artists)} with tags/genres")
     all_artists = {**existing_artists_dict, **unenriched_artists}
-    load_to_s3(list(all_artists.values()), "artists")
+    load_to_s3(list(all_artists.values()), "artists", user)
     return list(all_artists.values())
 def main():
-    a = get_artists_genres()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    get_artists_genres(user=user)
 if __name__ == "__main__":
     main()

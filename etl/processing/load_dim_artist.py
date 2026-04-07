@@ -7,16 +7,18 @@ from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def load_dim_artist():
+def load_dim_artist(user="jason"):
     load_dotenv()
     #Grabbing artists from saved tracks in the library and streaming history.
     #This grabs all artists even if they aren't in the library 
-    artist_query = '''SELECT DISTINCT id, name 
+    artist_query = f"""SELECT DISTINCT id, name 
                     FROM artists 
+                    WHERE user = '{user}'
                     union 
                     SELECT DISTINCT NULL, master_metadata_album_artist_name
                     FROM streaming_history
-                    WHERE master_metadata_album_artist_name IS NOT NULL'''
+                    WHERE master_metadata_album_artist_name IS NOT NULL
+                    AND user = '{user}'"""
     #Run athena query
     rows = run_athena_query(artist_query)
     if not rows:
@@ -36,19 +38,19 @@ def load_dim_artist():
             with conn.cursor() as cursor:
                 #Grab the table row count so we can compare after the insert
                 #We are doing the count of inserted records this way because cursor.rowcount is not consistent
-                cursor.execute("SELECT count(*) from dim_artist")
+                cursor.execute(f"SELECT count(*) from {user}.dim_artist")
                 row_count_before = int(cursor.fetchall()[0][0])
                 #Parameterize the genres into the insert commands
                 execute_values(
                     cursor,
-                    "INSERT INTO dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (artist_name) DO NOTHING",
+                    f"INSERT INTO {user}.dim_artist (spotify_artist_id, artist_name) VALUES %s ON CONFLICT (artist_name) DO NOTHING",
                     [(artist[0] if artist[0] else None, artist[1]) for artist in artist_set]
                 )
                 #Grab table row count after the insert for comparison
-                cursor.execute("SELECT count(*) from dim_artist")
+                cursor.execute(f"SELECT count(*) from {user}.dim_artist")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                logger.info(f"Inserted {diff_row_count} new records into dim_artist")
+                logger.info(f"Inserted {diff_row_count} new records into {user}.dim_artist")
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
@@ -58,6 +60,8 @@ def load_dim_artist():
         if conn:
             conn.close()
 def main():
-    l = load_dim_artist()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    load_dim_artist(user=user)
 if __name__ == "__main__":
     main()

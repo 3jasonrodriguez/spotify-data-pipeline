@@ -8,12 +8,13 @@ import pandas as pd
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def load_bridge_artist_genre():
+def load_bridge_artist_genre(user="jason"):
     load_dotenv()
-    bridge_query = """SELECT a.name, tag
+    bridge_query = f"""SELECT a.name, tag
     FROM artists a
     CROSS JOIN UNNEST(tags) AS t(tag)
-    WHERE tag IS NOT NULL"""
+    WHERE tag IS NOT NULL 
+    AND user = {user}"""
     #Run athena query
     rows = run_athena_query(bridge_query)
     if not rows:
@@ -36,12 +37,12 @@ def load_bridge_artist_genre():
             with conn.cursor() as cursor:
                 #Grab the table row count so we can compare after the insert
                 #We are doing the count of inserted records this way because cursor.rowcount is not consistent
-                cursor.execute("SELECT count(*) from bridge_artist_genre")
+                cursor.execute(f"SELECT count(*) from {user}.bridge_artist_genre")
                 row_count_before = int(cursor.fetchall()[0][0])
                 #Grab mapping of track ids and track keys
-                cursor.execute("SELECT DISTINCT artist_name, artist_key  FROM dim_artist")
+                cursor.execute(f"SELECT DISTINCT artist_name, artist_key  FROM {user}.dim_artist")
                 artist_mapping = {row[0]: row[1] for row in cursor.fetchall()}
-                cursor.execute("SELECT DISTINCT genre_name, genre_key FROM dim_genre")
+                cursor.execute(f"SELECT DISTINCT genre_name, genre_key FROM {user}.dim_genre")
                 genre_mapping = {row[0]: row[1] for row in cursor.fetchall()}
                 # check how many rows pass the filter
                 valid_rows = [(artist_mapping.get(row.artist_name), genre_mapping.get(row.genre_name)) 
@@ -50,14 +51,14 @@ def load_bridge_artist_genre():
                 #Parameterize the keys, ids, added_at into the insert commands
                 execute_values(
                     cursor,
-                    "INSERT INTO bridge_artist_genre (artist_key, genre_key) VALUES %s ON CONFLICT (artist_key, genre_key) DO NOTHING",
+                    f"INSERT INTO {user}.bridge_artist_genre (artist_key, genre_key) VALUES %s ON CONFLICT (artist_key, genre_key) DO NOTHING",
                     [(r[0], r[1]) for r in valid_rows]
                 )
                 #Grab table row count after the insert for comparison
-                cursor.execute("SELECT count(*) from bridge_artist_genre")
+                cursor.execute(f"SELECT count(*) from {user}.bridge_artist_genre")
                 row_count_after = int(cursor.fetchall()[0][0])
                 diff_row_count = row_count_after-row_count_before
-                logger.info(f"Inserted {diff_row_count} new records into bridge_artist_genre")
+                logger.info(f"Inserted {diff_row_count} new records into {user}.bridge_artist_genre")
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
@@ -67,6 +68,8 @@ def load_bridge_artist_genre():
         if conn:
             conn.close()
 def main():
-    l = load_bridge_artist_genre()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    load_bridge_artist_genre(user=user)
 if __name__ == "__main__":
     main()

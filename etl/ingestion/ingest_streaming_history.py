@@ -8,12 +8,12 @@ import logging
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def ingest_streaming_history():
+def ingest_streaming_history(user="jason"):
     #Loading of config file with path to streaming history
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
     #Loading the files from the paths
-    path = config["paths"]["streaming_history"]
+    path = config["paths"][f"streaming_history_{user}"]
     #Only grab the audio files (json)
     json_files = [f for f in os.listdir(path) if f.endswith(".json")]
     #Using a dict to put each stream by year for later partitioning
@@ -43,13 +43,15 @@ def ingest_streaming_history():
     # Upload year by year and clear from memory
     for year, records in records_dict_year.items():
         logger.info(f"Uploading {len(records)} records for year {year}")
-        load_to_s3(records, "streaming_history", year=year)
+        load_to_s3(records, "streaming_history", user, year=year)
         records_dict_year[year] = []  # clear from memory after upload
     
     logger.info("Streaming history ingestion complete")
     return records_dict_year
             
 def main():
-    records_by_year = ingest_streaming_history()
+    import sys
+    user = sys.argv[1] if len(sys.argv) > 1 else "jason"
+    ingest_streaming_history(user=user)
 if __name__ == "__main__":
     main()
