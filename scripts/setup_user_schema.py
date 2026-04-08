@@ -1,5 +1,6 @@
 import psycopg2
-from etl.utils.connections import get_postgres_conn
+import os
+from etl.utils.connections import get_setup_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -87,7 +88,7 @@ def setup_user(user, drop_public=False):
     conn = None
     try:
         #Open postgres connection
-        with get_postgres_conn() as conn:
+        with get_setup_conn() as conn:
             with conn.cursor() as cursor:
                 create_schema(cursor, user)
                 if drop_public:

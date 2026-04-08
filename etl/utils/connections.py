@@ -61,4 +61,13 @@ def get_spotify_credentials():
             "client_secret": os.getenv("SPOTIFY_CLIENT_SECRET"),
             "refresh_token": os.getenv("SPOTIFY_REFRESH_TOKEN")
         }
+    
+def get_setup_conn():
+    return psycopg2.connect(
+        host=os.environ.get("POSTGRES_HOST", "postgres"),
+        port=os.environ.get("POSTGRES_PORT", 5432),
+        dbname=os.environ.get("POSTGRES_DB", "spotify"),
+        user=os.environ.get("POSTGRES_USER", "airflow"),
+        password=os.environ.get("POSTGRES_PASSWORD", "airflow")
+    )
 
