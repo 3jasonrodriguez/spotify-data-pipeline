@@ -63,6 +63,7 @@ def get_spotify_credentials():
         }
     
 def get_setup_conn():
+    print(f"Connecting as user: {os.environ.get('POSTGRES_USER', 'airflow')}")
     return psycopg2.connect(
         host=os.environ.get("POSTGRES_HOST", "postgres"),
         port=os.environ.get("POSTGRES_PORT", 5432),
