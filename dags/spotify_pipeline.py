@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
 from airflow.models.param import Param
+from airflow.operators.python import ShortCircuitOperator
 from etl.utils.connections import get_spotify_credentials, get_aws_client
 from datetime import datetime, timedelta
 from etl.ingestion.get_artists_genres import get_artists_genres
@@ -28,7 +29,8 @@ with DAG(
     schedule='0 6 * * *',  # daily at 6am
     catchup=False,
     params={
-        "user": Param(default="jason", type="string")
+        "user": Param(default="jason", type="string"),
+        "ingest_streaming_history": Param(default=False, type="boolean")
     }
 ) as dag:
     # tasks go here
@@ -82,6 +84,16 @@ with DAG(
         python_callable=load_fact_play_event,
         op_kwargs={"user": "{{ params.user }}"}
     )
+    #Used for determining whether to ingest the satreaming history or not
+    def should_ingest_streaming(**context):
+        return context["params"]["ingest_streaming_history"]
+
+    check_streaming_history_task = ShortCircuitOperator(
+        task_id='check_streaming_history',
+        python_callable=should_ingest_streaming,
+        ignore_downstream_trigger_rules=False
+    )
+    check_streaming_history_task >> ingest_streaming_history_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_genre_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_artist_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_track_task

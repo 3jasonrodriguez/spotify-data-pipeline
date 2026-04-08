@@ -12,29 +12,36 @@ from etl.utils.streamlit_connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def top_ten_songs(conn):
-    query = streamlit_queries.TOP_TEN_SONGS
+
+def get_users(conn):
+    query = streamlit_queries.GET_USERS
+    df = pd.read_sql(query, conn)
+    user_list = df['schema_name'].tolist()
+    return user_list
+
+def top_ten_songs(conn, user):
+    query = streamlit_queries.TOP_TEN_SONGS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Top 10 Most Played Songs")
     #Display data table
     st.dataframe(df, hide_index=True)
 
-def yearly_streaming_hours(conn):
-    query = streamlit_queries.HOURS_PER_YEAR
+def yearly_streaming_hours(conn, user):
+    query = streamlit_queries.HOURS_PER_YEAR.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Annual Streaming Hours")
     #Display bar chart
     st.bar_chart(df.set_index('year'), color="#7DF9FF", x_label="Year", y_label="Hours Listened")  
 
-def listening_streaks(conn):
-    query = streamlit_queries.LISTENING_STREAK
+def listening_streaks(conn, user):
+    query = streamlit_queries.LISTENING_STREAK.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Track Listening Streaks")
     #Display bar chart
     st.dataframe(df, hide_index=True)
 
-def streams_by_day(conn):
-    query = streamlit_queries.STREAMS_BY_DAY
+def streams_by_day(conn, user):
+    query = streamlit_queries.STREAMS_BY_DAY.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Streams By Day")
     #Display bar chart
@@ -45,8 +52,8 @@ def streams_by_day(conn):
     df = df.sort_values('day_of_week')
     st.bar_chart(df, color="#7DF9FF", x_label="Day of the Week", y_label="Hours Listened", x="day_of_week", y="hours_played")  
 
-def genre_trends(conn):
-    query = streamlit_queries.GENRE_YEAR_TRENDS
+def genre_trends(conn, user):
+    query = streamlit_queries.GENRE_YEAR_TRENDS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Yearly Genre Trends")
     pivot_df = df.pivot(index='year', columns='genre_name', values='hours_played')
@@ -66,8 +73,8 @@ def generate_word_cloud(text_data):
     ).generate(text_data)
     return wordcloud
 
-def artists_wordcloud(conn):
-    query = streamlit_queries.ALL_ARTISTS
+def artists_wordcloud(conn, user):
+    query = streamlit_queries.ALL_ARTISTS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Top Artists")
     text_artists = " ".join(df['artist_name'].astype(str).tolist())
@@ -78,8 +85,8 @@ def artists_wordcloud(conn):
     ax.axis("off") # Hide the axes
     st.pyplot(fig) 
 
-def date_streams(conn):
-    query = streamlit_queries.DATE_STREAMS
+def date_streams(conn, user):
+    query = streamlit_queries.DATE_STREAMS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("All Music Streams")
     #Aggregate the hours played by date
@@ -128,8 +135,8 @@ def date_streams(conn):
             #Display the drill down table with filtered data
             st.dataframe(filtered_df, hide_index=True)
 
-def library_adds(conn):
-    query = streamlit_queries.LIBRARY_ADDS
+def library_adds(conn, user):
+    query = streamlit_queries.LIBRARY_ADDS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("My Library Growth")
     
@@ -187,14 +194,21 @@ def app():
             #Render the Visualizations
             st.set_page_config(layout="wide")
             st.title("My Spotify Analytics")
-            date_streams(conn)
-            genre_trends(conn)
-            library_adds(conn)
-            listening_streaks(conn)
-            streams_by_day(conn)
-            top_ten_songs(conn)
-            yearly_streaming_hours(conn)
-            artists_wordcloud(conn)
+            user_list_options = get_users(conn)
+            #Available user selection
+            user = st.sidebar.selectbox(
+                "Select User",
+                options=user_list_options,
+                index=0
+            )
+            date_streams(conn, user)
+            genre_trends(conn, user)
+            library_adds(conn, user)
+            listening_streaks(conn, user)
+            streams_by_day(conn, user)
+            top_ten_songs(conn, user)
+            yearly_streaming_hours(conn, user)
+            artists_wordcloud(conn, user)
 
     except psycopg2.Error as e:
         logger.error(f"Database error: {e}")

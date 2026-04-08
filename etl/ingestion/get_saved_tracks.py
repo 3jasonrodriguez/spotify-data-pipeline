@@ -75,7 +75,7 @@ def get_saved_tracks(user="jason"):
             saved_url = None
             break
     logger.debug(f"Retrieved {len(saved_list)} saved tracks") 
-    load_to_s3(saved_list, "saved_tracks",user)
+    load_to_s3(saved_list, "saved_tracks",user, snapshot=True)
 
 
 def main():
