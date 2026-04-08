@@ -14,7 +14,7 @@ def load_bridge_artist_genre(user="jason"):
     FROM artists a
     CROSS JOIN UNNEST(tags) AS t(tag)
     WHERE tag IS NOT NULL 
-    AND user = {user}"""
+    AND user = '{user}'"""
     #Run athena query
     rows = run_athena_query(bridge_query)
     if not rows:
