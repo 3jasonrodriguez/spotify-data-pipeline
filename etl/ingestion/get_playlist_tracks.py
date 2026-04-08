@@ -3,7 +3,7 @@ import json
 from dotenv import load_dotenv
 from datetime import datetime
 from etl.utils.spotify_auth import get_spotify_access_token
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from etl.utils.connections import get_aws_client
 import requests
 from requests.exceptions import RequestException, HTTPError
 import boto3
@@ -12,7 +12,7 @@ from botocore.exceptions import NoCredentialsError
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def get_playlist_tracks():
+def get_playlist_tracks(user="jason"):
     load_dotenv()
     #Using creds to for s3 client connect
     s3_client = get_aws_client("s3")
@@ -59,7 +59,7 @@ def get_playlist_tracks():
     #Grab playlist ids
     playlist_ids = [p["id"] for p in playlists if p and p.get("id")]
     #Get access token
-    token = get_spotify_access_token()
+    token = get_spotify_access_token(user)
     #For each playlist, grab the tracks
     for id in playlist_ids:
         items_url = f"https://api.spotify.com/v1/playlists/{id}/items"

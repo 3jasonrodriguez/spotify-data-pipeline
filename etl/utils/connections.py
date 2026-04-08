@@ -46,9 +46,9 @@ def get_aws_client(service):
             region_name=os.getenv("AWS_REGION")
         )
     
-def get_spotify_credentials():
+def get_spotify_credentials(user="jason"):
     try:
-        spotify_conn = BaseHook.get_connection("spotify_api")
+        spotify_conn = BaseHook.get_connection(f"spotify_api_{user}")
         return {
             "client_id": spotify_conn.login,
             "client_secret": spotify_conn.password,
@@ -57,9 +57,9 @@ def get_spotify_credentials():
     except Exception:
         load_dotenv()
         return {
-            "client_id": os.getenv("SPOTIFY_CLIENT_ID"),
-            "client_secret": os.getenv("SPOTIFY_CLIENT_SECRET"),
-            "refresh_token": os.getenv("SPOTIFY_REFRESH_TOKEN")
+            "client_id": os.getenv(f"{user.upper()}_SPOTIFY_CLIENT_ID"),
+            "client_secret": os.getenv(f"{user.upper()}_SPOTIFY_CLIENT_SECRET"),
+            "refresh_token": os.getenv(f"{user.upper()}_SPOTIFY_REFRESH_TOKEN")
         }
     
 def get_setup_conn():

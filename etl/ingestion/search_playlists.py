@@ -1,5 +1,4 @@
 from etl.utils.spotify_auth import get_spotify_access_token
-from etl.utils.connections import get_spotify_credentials, get_aws_client
 import requests
 from requests.exceptions import RequestException, HTTPError
 from etl.utils.logger import get_logger 
@@ -8,7 +7,7 @@ logger = get_logger(__name__)
 #Search_list is a list of the strings for the object type we will search through
 #Search types are defined within this function in a map
 #Limit is defined for returning results. The max is 50 in the API.
-def spotify_searches(search_list, search_type, limit):
+def spotify_searches(search_list, search_type, limit, user="jason"):
     #Used for the "object" type in Spotify that we are searching for. The plural form is used within the nested JSON
     type_map = {"playlist":"playlists", "artist":"artists", "track":"tracks", "album":"albums"}
     if search_type not in type_map:
@@ -17,7 +16,7 @@ def spotify_searches(search_list, search_type, limit):
     all_results = []
 
     #Build out search API call
-    token = get_spotify_access_token()
+    token = get_spotify_access_token(user)
     search_url = "https://api.spotify.com/v1/search"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -76,6 +75,7 @@ def spotify_searches(search_list, search_type, limit):
 #Define main for reusability and importing
 def main():
     genre_list = ["prog rock", "progressive rock", "math rock"]
-    searches = spotify_searches(genre_list, "playlists", 10)
+    user = input("Please enter user:" )
+    searches = spotify_searches(genre_list, "playlists", 10, user)
 if __name__ == "__main__":
     main()

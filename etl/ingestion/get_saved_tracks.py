@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import math
 from etl.ingestion.load_to_s3 import load_to_s3
 from etl.utils.spotify_auth import get_spotify_access_token
-from etl.utils.connections import get_aws_client
 import requests
 from requests.exceptions import RequestException, HTTPError
 from etl.utils.logger import get_logger 
@@ -13,7 +12,7 @@ logger = get_logger(__name__)
 def get_saved_tracks(user="jason"):
     load_dotenv()
     #Grab token
-    token = get_spotify_access_token()
+    token = get_spotify_access_token(user)
     #Set limit param
     params = {
         'limit':50,

@@ -10,7 +10,7 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import NoCredentialsError   
 from difflib import SequenceMatcher
 from etl.ingestion.load_to_s3 import load_to_s3
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from etl.utils.connections import get_aws_client
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
