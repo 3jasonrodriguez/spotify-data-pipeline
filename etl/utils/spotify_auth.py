@@ -70,10 +70,6 @@ def get_spotify_access_token (user="jason"):
     return None
 
 def main():
-    #get_auth_code_url("kelly")
-    #e = exchange_code_for_tokens("AQAC6dnPilgFWYYcBsb4CTKtLIlRE61-qiVbhtCUhmg08XlKbqmWbmtLN2VQxgLc4JMGg55AbRgMD3-UsakzVaDLhwTzFaMoMSxPXAsk7Vv8TAUslOqbRV0PP8n4A-kMDhMk9sLY2d_dX8i8cfSSFZ3L6UMgvOVh08AoanrUgLMT3nnMPFevWuhYIkt_4_-xrNsJcuJNS32DSAPsu9yRY1RS_q7WezuoKYFyzA","kelly")
-    #print(e)
-    t = get_spotify_access_token("kelly")
-    print(t)
+    logger.info("Running auth for Spotify")
 if __name__ == "__main__":
     main()
