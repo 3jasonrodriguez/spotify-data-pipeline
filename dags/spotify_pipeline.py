@@ -32,9 +32,7 @@ with DAG(
     catchup=False,
     params={
         "user": Param(default="jason", type="string"),
-        "ingest_streaming_history": Param(default=False, type="boolean"),    
-        "extract_only": Param(default=False, type="boolean"),
-        "load_only": Param(default=False, type="boolean")
+        "ingest_streaming_history": Param(default=False, type="boolean")
     }
 ) as dag:
     # tasks go here
@@ -91,41 +89,19 @@ with DAG(
     #Used for determining whether to ingest the streaming history, extract to s3 only, or load to postgres only
     def should_ingest_streaming(**context):
         return context["params"]["ingest_streaming_history"]
-    def should_extract(**context):
-        return not context["params"]["load_only"]
-    def should_load(**context):
-        extract_only = context["params"]["extract_only"]
-        logger.info(f"extract_only value: {extract_only}, type: {type(extract_only)}")
-        return not extract_only
-    check_extract_task = ShortCircuitOperator(
-        task_id='check_extract',
-        python_callable=should_extract,
-        ignore_downstream_trigger_rules=False
-    )
-
-    check_load_task = ShortCircuitOperator(
-        task_id='check_load',
-        python_callable=should_load,
-        ignore_downstream_trigger_rules=False,
-        trigger_rule=TriggerRule.ALL_DONE
-    )
 
     check_streaming_history_task = ShortCircuitOperator(
         task_id='check_streaming_history',
         python_callable=should_ingest_streaming,
-        ignore_downstream_trigger_rules=False,
-        trigger_rule=TriggerRule.NONE_FAILED
+        ignore_downstream_trigger_rules=True
     )
         
-    check_extract_task >> extract_saved_tracks_task
-    check_extract_task >> check_streaming_history_task >> ingest_streaming_history_task
-    extract_saved_tracks_task >> extract_artists_genres_task
+    check_streaming_history_task >> ingest_streaming_history_task
 
-    [extract_saved_tracks_task, extract_artists_genres_task, check_streaming_history_task] >> check_load_task    
-    check_load_task >> load_dim_genre_task
-    check_load_task >> load_dim_artist_task
-    check_load_task >> load_dim_track_task
-    check_load_task >> load_dim_date_task
+    [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_genre_task
+    [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_artist_task
+    [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_track_task
+    [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_date_task
 
     [load_dim_genre_task, load_dim_artist_task, load_dim_track_task, load_dim_date_task] >> load_dim_library_task
     [load_dim_genre_task, load_dim_artist_task, load_dim_track_task, load_dim_date_task] >> load_bridge_artist_genre_task
