@@ -34,15 +34,14 @@ def load_dim_track(user="jason"):
     if not rows:
         logger.warning(f"No rows returned from the athena query: {tracks_query}")
         return
-    tracks_set = set()
-    #iterate over each row after the headers
+    tracks_dict = {}
     for t in rows[1:]:
-        #Grab the track id/name/duration and add them to the artist set
         track_id = t.get('Data')[0].get('VarCharValue')
         name = t.get('Data')[1].get('VarCharValue')
         duration = t.get('Data')[2].get('VarCharValue')
         duration = int(duration) if duration else None
-        tracks_set.add((track_id, name, duration))
+        if track_id not in tracks_dict or (duration and not tracks_dict[track_id][2]):
+            tracks_dict[track_id] = (track_id, name, duration)
     conn = None
     try:
         #Open postgres connection
@@ -58,7 +57,7 @@ def load_dim_track(user="jason"):
                     f"""INSERT INTO {user}.dim_track (spotify_track_id, track_name, duration_ms) VALUES %s ON CONFLICT (spotify_track_id) DO UPDATE 
                         SET duration_ms = EXCLUDED.duration_ms 
                         WHERE dim_track.duration_ms IS NULL""",
-                    [(track[0], track[1], track[2]) for track in tracks_set]
+                    [(tracks_dict[track][0], tracks_dict[track][1], tracks_dict[track][2]) for track in tracks_dict]
                 )
                 #Grab table row count after the insert for comparison
                 cursor.execute(f"SELECT count(*) from {user}.dim_track")
