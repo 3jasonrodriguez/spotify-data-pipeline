@@ -56,6 +56,15 @@ def genre_trends(conn, user):
     query = streamlit_queries.GENRE_YEAR_TRENDS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("Yearly Genre Trends")
+
+    all_genres = sorted(df['genre_name'].unique().tolist())
+    selected_genres = st.multiselect(
+        "Filter Genres",
+        options=all_genres,
+    )
+    if selected_genres:
+        df = df[df['genre_name'].isin(selected_genres)]
+
     pivot_df = df.pivot(index='year', columns='genre_name', values='hours_played')
     pivot_df.index = pivot_df.index.astype(str)
     st.line_chart(pivot_df, x_label="Year", y_label="Hours Played")
@@ -139,11 +148,8 @@ def library_adds(conn, user):
     query = streamlit_queries.LIBRARY_ADDS.format(user=user)
     df = pd.read_sql(query, conn)
     st.header("My Library Growth")
-    
     saved_dates = df.groupby("saved_at").size().reset_index(name="count")
-    
     brush = alt.selection_interval(encodings=['x'])
-    
     area = alt.Chart(saved_dates).mark_area(
         line={'color': '#BF40BF'},
         color=alt.Gradient(
@@ -160,9 +166,7 @@ def library_adds(conn, user):
         tooltip=["saved_at:T", "count:Q"],
         opacity=alt.condition(brush, alt.value(1), alt.value(0.3))
     ).add_params(brush)
-    
     selected_plot = st.altair_chart(area, on_select="rerun")
-    
     if selected_plot and selected_plot.get('selection', {}).get('param_1'):
         selected = selected_plot['selection']['param_1']
         if 'saved_at' in selected:
@@ -183,6 +187,20 @@ def library_adds(conn, user):
                 use_container_width=True
             )
 
+def kpis(conn, user):
+    query = streamlit_queries.KPIS.format(user=user)
+    df = pd.read_sql(query, conn)
+    row = df.iloc[0]
+    
+    st.header("Overview")
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    col1.metric("Total Streams", f"{int(row['total_streams']):,}")
+    col2.metric("Hours Listened", f"{row['total_hours']:,.1f}")
+    col3.metric("Days Listened", f"{int(row['total_days']):,}")
+    col4.metric("Unique Tracks", f"{int(row['total_tracks']):,}")
+    col5.metric("Unique Artists", f"{int(row['total_artists']):,}")
+    col6.metric("Unique Genres", f"{int(row['total_genres']):,}")   
 
 
 def app():
@@ -201,6 +219,7 @@ def app():
                 options=user_list_options,
                 index=0
             )
+            kpis(conn, user)
             date_streams(conn, user)
             genre_trends(conn, user)
             library_adds(conn, user)

@@ -69,8 +69,22 @@ LIBRARY_ADDS='''SELECT distinct artist_name, track_name, DATE(saved_at) as saved
             INNER JOIN {user}.dim_artist a ON f.artist_key=a.artist_key
 '''
 
-GET_USERS='''SELECT schema_name 
-FROM information_schema.schemata
-WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
-  AND schema_name NOT LIKE 'pg_toast%'
-  AND schema_name NOT LIKE 'pg_temp%';'''
+GET_USERS = """SELECT schema_name 
+    FROM information_schema.schemata
+    WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'public')
+    AND schema_name NOT LIKE 'pg_toast%'
+    AND schema_name NOT LIKE 'pg_temp%'
+"""
+KPIS='''SELECT
+    COUNT(DISTINCT fpe.play_key) as total_streams,
+    ROUND(SUM(fpe.ms_played) / 3600000.0, 1) as total_hours,
+    COUNT(DISTINCT dd.full_date) as total_days,
+    COUNT(DISTINCT dt.track_key) as total_tracks,
+    COUNT(DISTINCT da.artist_key) as total_artists,
+    COUNT(DISTINCT dg.genre_key) as total_genres
+FROM {user}.fact_play_event fpe
+JOIN {user}.dim_date dd ON fpe.date_key = dd.dim_date_key
+JOIN {user}.dim_track dt ON fpe.track_key = dt.track_key
+JOIN {user}.dim_artist da ON fpe.artist_key = da.artist_key
+JOIN {user}.bridge_artist_genre bag ON da.artist_key = bag.artist_key
+JOIN {user}.dim_genre dg ON bag.genre_key = dg.genre_key'''
