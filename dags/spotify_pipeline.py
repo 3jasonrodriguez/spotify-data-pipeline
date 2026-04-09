@@ -15,6 +15,8 @@ from etl.processing.load_dim_date import load_dim_date
 from etl.processing.load_dim_library import load_dim_library
 from etl.processing.load_dim_track import load_dim_track
 from etl.processing.load_fact_play_event import load_fact_play_event
+from etl.utils.logger import get_logger 
+logger = get_logger(__name__)
 
 default_args = {
     'owner': 'airflow',
@@ -92,7 +94,9 @@ with DAG(
     def should_extract(**context):
         return not context["params"]["load_only"]
     def should_load(**context):
-        return not context["params"]["extract_only"]
+        extract_only = context["params"]["extract_only"]
+        logger.info(f"extract_only value: {extract_only}, type: {type(extract_only)}")
+        return not extract_only
     check_extract_task = ShortCircuitOperator(
         task_id='check_extract',
         python_callable=should_extract,

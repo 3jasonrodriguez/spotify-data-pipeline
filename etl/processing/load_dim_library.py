@@ -34,7 +34,7 @@ def load_dim_library(user="jason"):
         with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 #Grab mapping of track ids and track keys
-                cursor.execute(f"SELECT spotify_track_id, track_key {user}.FROM dim_track")
+                cursor.execute(f"SELECT spotify_track_id, track_key FROM {user}.dim_track")
                 track_mapping = {row[0]: row[1] for row in cursor.fetchall()}
                 valid_rows = [(track_mapping.get(row.track_id), row.added_at) for row in df.itertuples(index=False) if track_mapping.get(row.track_id)]
                 #Truncate the table daily. Helps keep the library accurate with what is in the library daily
