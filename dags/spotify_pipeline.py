@@ -107,7 +107,7 @@ with DAG(
         task_id='check_load',
         python_callable=should_load,
         ignore_downstream_trigger_rules=False,
-        trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS
+        trigger_rule=TriggerRule.ALL_DONE
     )
 
     check_streaming_history_task = ShortCircuitOperator(
