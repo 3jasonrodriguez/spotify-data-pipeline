@@ -3,7 +3,7 @@ from airflow.decorators import dag, task
 from airflow.operators.python import PythonOperator
 from airflow.models.param import Param
 from airflow.operators.python import ShortCircuitOperator
-from etl.utils.connections import get_spotify_credentials, get_aws_client
+from airflow.utils.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
 from etl.ingestion.get_artists_genres import get_artists_genres
 from etl.ingestion.get_saved_tracks import get_saved_tracks
@@ -102,20 +102,22 @@ with DAG(
     check_load_task = ShortCircuitOperator(
         task_id='check_load',
         python_callable=should_load,
-        ignore_downstream_trigger_rules=False
+        ignore_downstream_trigger_rules=False,
+        trigger_rule=TriggerRule.NONE_FAILED
     )
+
     check_streaming_history_task = ShortCircuitOperator(
         task_id='check_streaming_history',
         python_callable=should_ingest_streaming,
-        ignore_downstream_trigger_rules=False
+        ignore_downstream_trigger_rules=False,
+        trigger_rule=TriggerRule.NONE_FAILED
     )
         
     check_extract_task >> extract_saved_tracks_task
+    check_extract_task >> check_streaming_history_task >> ingest_streaming_history_task
     extract_saved_tracks_task >> extract_artists_genres_task
 
-    check_streaming_history_task >> ingest_streaming_history_task
-
-    [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> check_load_task
+    [extract_saved_tracks_task, extract_artists_genres_task, check_streaming_history_task] >> check_load_task    
     check_load_task >> load_dim_genre_task
     check_load_task >> load_dim_artist_task
     check_load_task >> load_dim_track_task
