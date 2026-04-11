@@ -42,7 +42,7 @@ As the data got cleaner and the schema took shape, the analysis evolved. New que
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture.png)
+![Architecture Diagram](docs/architecture.svg)
 
 ### Medallion Layers
 
