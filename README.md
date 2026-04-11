@@ -3,7 +3,7 @@
 > A personal data engineering portfolio project — ingesting, transforming, and visualizing 10+ years of Spotify listening history using a modern cloud data stack.
 
 [![Dashboard Demo](https://img.youtube.com/vi/12h5bisPd_8/maxresdefault.jpg)](https://www.youtube.com/watch?v=12h5bisPd_8)
-*Click to watch a short demo of the Airflow DAG and Streamlit dashboard*
+*Click to watch a short demo of the Streamlit dashboard*
 
 ---
 
