@@ -105,12 +105,18 @@ The pipeline is designed to be safely re-runnable:
 **Why LocalExecutor?** The pipeline started with CeleryExecutor, which requires a Redis broker and a separate Celery worker container. There's no genuine parallelism need here — tasks run sequentially. CeleryExecutor added memory overhead and operational complexity without benefit. Dropping it freed meaningful RAM on the t3.small and simplified `docker-compose.yml`.
 
 Key parameter choices:
-
+ 
 | Parameter | Value | Reason |
 |-----------|-------|--------|
-| `max_active_runs` | `1` | Prevents concurrent runs that would race on truncate-reload tables |
 | `catchup` | `False` | Pipeline is run on-demand; backfill would reprocess unintended windows |
-| Task retries | Per-task on API tasks | Handles transient rate limit errors without failing the full DAG |
+| Task retries | `3` with 5-min delay | Handles transient rate limit errors without failing the full DAG |
+ 
+The DAG exposes two runtime params:
+ 
+| Param | Default | Description |
+|-------|---------|-------------|
+| `user` | `jason` | Lowercase string identifying whose data to run the pipeline for — scopes all tasks and S3 paths to that user, supporting multi-user execution without schema changes |
+| `ingest_streaming_history` | `False` | When `True`, triggers ingestion of the full streaming history flat files via a `ShortCircuitOperator`. Left as an optional flag since the JSON files don't change frequently — useful for full reloads or testing the end-to-end pipeline |
 
 ### EC2 Instance Selection
 
