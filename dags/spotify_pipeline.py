@@ -1,9 +1,6 @@
-from airflow import DAG
-from airflow.decorators import dag, task
-from airflow.operators.python import PythonOperator
-from airflow.models.param import Param
-from airflow.operators.python import ShortCircuitOperator
-from airflow.utils.trigger_rule import TriggerRule
+from airflow.sdk import DAG, Param
+from airflow.providers.standard.operators.python import PythonOperator, ShortCircuitOperator
+from airflow.task.trigger_rule import TriggerRule
 from datetime import datetime, timedelta
 from etl.ingestion.get_artists_genres import get_artists_genres
 from etl.ingestion.get_saved_tracks import get_saved_tracks
@@ -97,7 +94,8 @@ with DAG(
     )
         
     check_streaming_history_task >> ingest_streaming_history_task
-
+    extract_saved_tracks_task >> extract_artists_genres_task
+    
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_genre_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_artist_task
     [extract_saved_tracks_task, extract_artists_genres_task, ingest_streaming_history_task] >> load_dim_track_task

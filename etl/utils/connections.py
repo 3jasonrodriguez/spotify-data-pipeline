@@ -1,4 +1,4 @@
-from airflow.hooks.base import BaseHook
+from airflow.sdk.bases.hook import BaseHook
 import json
 import psycopg2
 import os
@@ -63,7 +63,6 @@ def get_spotify_credentials(user="jason"):
         }
     
 def get_setup_conn():
-    print(f"Connecting as user: {os.environ.get('POSTGRES_USER', 'airflow')}")
     return psycopg2.connect(
         host=os.environ.get("POSTGRES_HOST", "postgres"),
         port=os.environ.get("POSTGRES_PORT", 5432),
