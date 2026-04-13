@@ -1,6 +1,5 @@
 # Spotify Data Pipeline - Core Services
 # Always-running stack: Postgres, Streamlit, MCP Server
-
 services:
   postgres:
     image: postgres:16
@@ -24,7 +23,7 @@ services:
   streamlit:
     build:
       context: .
-      dockerfile: Dockerfile.streamlit
+      dockerfile: docker/Dockerfile.streamlit
     env_file:
       - .env     
     ports:
