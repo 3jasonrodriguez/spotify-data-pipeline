@@ -45,4 +45,5 @@ volumes:
   postgres-db-volume:
 networks:
   spotify-network:
+    name: spotify-network
     driver: bridge
