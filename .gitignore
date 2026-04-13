@@ -5,5 +5,4 @@ data/raw/
 pipeline.log
 config.yaml
 logs/
-docker-compose.yml
 config/airflow.cfg

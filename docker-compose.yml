@@ -1,0 +1,49 @@
+# Spotify Data Pipeline - Core Services
+# Always-running stack: Postgres, Streamlit, MCP Server
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - spotify-network
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    env_file:
+      - .env     
+    ports:
+      - "8501:8501"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spotify-network
+
+
+volumes:
+  postgres-db-volume:
+networks:
+  spotify-network:
+    driver: bridge
