@@ -9,10 +9,12 @@ logger = get_logger(__name__)
 
 def ingest_streaming_history(user="jason"):
     #Loading of config file with path to streaming history
-    with open("config.yaml", "r") as f:
+    config_path = os.path.join(os.path.dirname(__file__), "../../config.yaml")
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     #Loading the files from the paths
-    path = config["paths"][f"streaming_history_{user}"]
+    base_path = config["paths"]["streaming_history_base"]
+    path = os.path.join(base_path, user, "streaming_history")
     #Only grab the audio files (json)
     json_files = [f for f in os.listdir(path) if f.endswith(".json")]
     #Using a dict to put each stream by year for later partitioning
