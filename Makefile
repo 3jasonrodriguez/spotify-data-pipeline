@@ -6,3 +6,6 @@ airflow-up:
 
 airflow-down:
 	docker-compose -f docker-compose.airflow.yml down
+
+airflow-restart:
+	docker-compose -f docker-compose.yml -f docker-compose.airflow.yml restart
