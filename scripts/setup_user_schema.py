@@ -83,6 +83,12 @@ def drop_public_tables(cursor):
     for table in tables:
         cursor.execute(f"DROP TABLE IF EXISTS public.{table} CASCADE")
         logger.info(f"Dropped public.{table}")
+#Function for spotify read only account for agents to execute queries
+def grant_readonly_access(cursor, user):
+    cursor.execute(f"GRANT USAGE ON SCHEMA {user} TO spotify_readonly")
+    cursor.execute(f"GRANT SELECT ON ALL TABLES IN SCHEMA {user} TO spotify_readonly")
+    cursor.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {user} GRANT SELECT ON TABLES TO spotify_readonly")
+    logger.info(f"Granted readonly access to schema {user}")
 #Setup db schema and tables per new user
 def setup_user(user, drop_public=False):
     conn = None
@@ -100,6 +106,8 @@ def setup_user(user, drop_public=False):
                 create_dim_library(cursor,user)
                 create_bridge_artist_genre(cursor,user)
                 create_fact_play_event(cursor, user)
+                grant_readonly_access(cursor, user) 
+
             conn.commit()
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
