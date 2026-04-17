@@ -31,7 +31,16 @@ Cross schema queries are valid since the schemas are in the same database and th
 Since the keys will be different, cross joins will need to be by human readable data (e.g. track name, artist name, etc.) instead of serial keys.
 This will be when analysis is required for comparisions or contrasts between users/schemas.
 
+Example analytical questions:
+Top 10 most time-listened tracks of all time
+Listening history over time by genre
+Top 10 tracks played during work hours
+Total listening time per year
+Saved library tracks never played
+Longest consecutive listening streak by track
+
 ##DDL for tables in a schema (per user):
+#is_work_hour is originally defined as between 8AM-5PM Eastern time (America/New York)
 CREATE TABLE dim_date (
     dim_date_key SERIAL PRIMARY KEY,
     full_date DATE,
@@ -45,6 +54,7 @@ CREATE TABLE dim_date (
 
 ALTER TABLE dim_date ADD CONSTRAINT unique_date_hour UNIQUE (full_date, hour);
 
+#duration_ms is measuring the milliseconds for a track's length
 CREATE TABLE dim_track (
     track_key SERIAL PRIMARY KEY,
     spotify_track_id VARCHAR(30),
@@ -68,7 +78,7 @@ CREATE TABLE dim_genre (
 );
 ALTER TABLE dim_genre ADD CONSTRAINT unique_genre_name UNIQUE (genre_name);
 
-
+#saved_at is the timestamp for when a track was added to my library
 CREATE TABLE dim_library (
     library_key SERIAL PRIMARY KEY,
     track_key INT REFERENCES dim_track(track_key),
@@ -82,6 +92,7 @@ CREATE TABLE bridge_artist_genre (
     PRIMARY KEY (artist_key, genre_key)
 );
 
+#ms_played is how long in milliseconds a track was played
 CREATE TABLE fact_play_event (
     play_key SERIAL PRIMARY KEY,
     date_key INT REFERENCES dim_date(dim_date_key),

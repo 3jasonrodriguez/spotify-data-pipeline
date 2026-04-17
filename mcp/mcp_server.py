@@ -2,7 +2,6 @@
 from mcp.server.fastmcp import FastMCP
 import mcp.schema_context as context
 import psycopg2
-from psycopg2.extras import execute_values
 from etl.utils.connections import get_postgres_conn
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
@@ -11,25 +10,20 @@ mcp = FastMCP("spotify-analytics")
 
 @mcp.tool()
 def execute_sql(query: str) -> str:
-    """
-    Execute a SQL query against the Spotify analytics database.
-    
-    Schema context:
-    {context.SCHEMA_CONTEXT}
-    """
-    # connect to postgres
+    """Execute a SQL query against the Spotify analytics database."""
     conn = None
     try:
         with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
-        # run the query
+                # run the query
                 cursor.execute(query)
                 results = cursor.fetchall()
-                
-                return 
+                # zip results into a dict
+                columns = [desc[0] for desc in cursor.description]
+                return str([dict(zip(columns, row)) for row in results])
     except psycopg2.Error as e:
         logger.error(f"Postgres error: {e}")
-
+        return f"Error executing query: {str(e)}"
     finally:
         if conn:
             conn.close()
