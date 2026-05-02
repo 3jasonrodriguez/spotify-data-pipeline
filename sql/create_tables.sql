@@ -55,3 +55,13 @@ CREATE TABLE fact_play_event (
     artist_key INT REFERENCES dim_artist(artist_key),
     ms_played INT
 );
+CREATE TABLE IF NOT EXISTS public.llm_eval_log (
+    eval_key SERIAL PRIMARY KEY,
+    evaluated_at TIMESTAMP DEFAULT NOW(),
+    question TEXT,
+    generated_sql TEXT,
+    passed BOOLEAN,
+    score INT,
+    reasoning TEXT,
+    flags TEXT[]
+);
