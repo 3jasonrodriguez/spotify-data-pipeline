@@ -7,14 +7,14 @@ logger = get_logger(__name__)
 load_dotenv()
 client = anthropic.Anthropic()
 
-JUDGE_SYSTEM_PROMPT = """
+JUDGE_SYSTEM_PROMPT = f"""
 You are a PostgreSQL expert evaluating LLM-generated SQL...
 You will serve to evaluate SQL before it is run on a Postgres database.
 The database holds Spotify streaming data for users and is modeled with a fact table and dimensional tables.
 The prior LLM call to produce this SQL outputs the statement, and a natural language response to explain the analysis and provide a little insight along with the results from the potential query.
 
 ## Database Schema
-{SCHEMA_CONTEXT}
+{JUDGE_CONTEXT}
 
 Roles:
 -judging SQL to see if it aligns with the schema, is correct, and not totally irrelevant to the question or database
@@ -54,80 +54,32 @@ Example JSON output:
 }
 
 """
-def evaluate(question: str, generated_sql: str, response: str) -> dict:
-    #Define tools available for Claude to use
-    TOOLS = [
-        {
-            "name": "evaluate_sql",
-            "description": "Evaluate and judge a SQL query statement with its natural language analysis against the original question prompted",
-            "input_schema": {
-                "type": "object",
-                "properties":{
-                    "question": {
-                        "type":"string",
-                        "description":"The original question from the user about data in the Spotify Postgres database"
-                    },
-                    "generated_sql": {
-                        "type":"string",
-                        "description":"The generated SQL statement to judge and evaluate before it is run in Postgres"
-                    },
-                    "response": {
-                        "type":"string",
-                        "description":"The natural language explanation of the analysis and query response"
-                    }
-                },
-                "required":["question", "generated_sql", "response"]
-            }
-        }
-    ]
-    client = anthropic.Anthropic()
+def evaluate(question: str, generated_sql: str, nl_response: str) -> dict:
     try:
-        passed = None
-        score = None
-        reasoning = None
-        flags = None
-        messages = [{"role": "user", "content": question}]
+        messages = [{
+            "role": "user",
+            "content": f"""
+            Question: {question}
+            Generated SQL: {generated_sql}
+            Natural Language Response: {nl_response}
+            Return your verdict as JSON only, no other text.
+            """
+        }]
 
-        # agentic loop - keeps going until LLM says end_turn
-        while True:
-            response = client.messages.create(
-                model="claude-sonnet-4-5",
-                max_tokens=1024,
-                system=get_system_prompt(JUDGE_SYSTEM_PROMPT),
-                tools=TOOLS,
-                messages=messages
-            )
+        response = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=JUDGE_SYSTEM_PROMPT,
+            messages=messages
+        )
 
-            if response.stop_reason == "tool_use":
-                tool_use = next(b for b in response.content if b.type == "tool_use")
-                produced_query = tool_use.input.get('query')
-                query_result = execute_sql(produced_query)
-
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": tool_use.id,
-                        "content": query_result
-                    }]
-                })
-
-            elif response.stop_reason == "end_turn":
-                final_text = next(b.text for b in response.content if hasattr(b, "text"))
-                match = re.search(r'<chart>(.*?)</chart>', final_text, re.DOTALL)
-                clean_text = re.sub(r'<chart>.*?</chart>', '', final_text, flags=re.DOTALL).strip()
-                if match:
-                    chart_spec = json.loads(match.group(1).strip())
-                break
+        verdict = json.loads(response.content[0].text)
+        
+        # write to postgres
+        log_eval(question, generated_sql, verdict)
+        
+        return verdict
 
     except Exception as e:
-        logger.error(f"Error in ask(): {e}")
-        return {"raw_data": None, "natural_language_response": f"Error: {str(e)}", "chart_spec": None}
-
-    return {"raw_data": query_result, "natural_language_response": clean_text, "chart_spec": chart_spec}
-    # call the API with JUDGE_SYSTEM_PROMPT
-    # parse the verdict from the response
-    # write to llm_eval_log
-    # return the verdict dict
-    pass
+        logger.error(f"Error in evaluate(): {e}")
+        return {"passed": True, "score": None, "reasoning": "Eval failed", "flags": []}
