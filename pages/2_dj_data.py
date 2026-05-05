@@ -154,31 +154,35 @@ def app():
                 st.write(f"Asking: {prompt}")
                 with st.spinner("DJ Data is thinking..."):
                     ask_response = ask(prompt, user_scope)
-                    print(ask_response)
-                    chart_spec = ask_response.get("chart_spec")
-                    text_response = ask_response.get("natural_language_response")
-                    raw_data_str = ask_response.get("raw_data")
-                    if raw_data_str:
-                        raw_data = json.loads(raw_data_str)
-                        df = pd.DataFrame(raw_data)
+                    verdict = ask_response.get("verdict")
+                    if verdict and not verdict.get("passed"):
+                        st.warning("⚠️ DJ Data isn't fully confident in this answer — consider rephrasing your question.")
+                        st.info("💡 If you used a suggested question, try clicking it again — DJ Data may generate a better query on the next attempt.")
                     else:
-                        df = pd.DataFrame()
-                    #render corresponding chart type
-                    if chart_spec and not df.empty:
-                        st.write(text_response)
-                        chart_type = chart_spec.get("chart_type")
-                        if chart_type == "bar":
-                            render_bar_chart(df, chart_spec)
-                        elif chart_type == "line":
-                            render_line_chart(df, chart_spec)
-                        elif chart_type == "area":
-                            render_area_chart(df, chart_spec)
-                        elif chart_type == "scatter":
-                            render_scatter_chart(df, chart_spec)
-                        elif chart_type == "table":
-                            render_table(df, chart_spec)
-                    elif df.empty:
-                        st.info("No data found for this question.")
+                        chart_spec = ask_response.get("chart_spec")
+                        text_response = ask_response.get("natural_language_response")
+                        raw_data_str = ask_response.get("raw_data")
+                        if raw_data_str:
+                            raw_data = json.loads(raw_data_str)
+                            df = pd.DataFrame(raw_data)
+                        else:
+                            df = pd.DataFrame()
+                        #render corresponding chart type
+                        if chart_spec and not df.empty:
+                            st.write(text_response)
+                            chart_type = chart_spec.get("chart_type")
+                            if chart_type == "bar":
+                                render_bar_chart(df, chart_spec)
+                            elif chart_type == "line":
+                                render_line_chart(df, chart_spec)
+                            elif chart_type == "area":
+                                render_area_chart(df, chart_spec)
+                            elif chart_type == "scatter":
+                                render_scatter_chart(df, chart_spec)
+                            elif chart_type == "table":
+                                render_table(df, chart_spec)
+                        elif df.empty:
+                            st.info("No data found for this question.")
                 #Add user's question to the query history
                 st.session_state.query_history.append(prompt)
                 if st.session_state.query_history:

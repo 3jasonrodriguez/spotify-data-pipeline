@@ -2,6 +2,7 @@ import re
 import json
 import anthropic
 from agent.system_prompt import get_system_prompt
+from agent.judge import evaluate
 from agent.mcp_server import execute_sql
 from etl.utils.logger import get_logger 
 from dotenv import load_dotenv
@@ -63,10 +64,12 @@ def ask(question: str, user_scope: str) -> dict:
                 clean_text = re.sub(r'<chart>.*?</chart>', '', final_text, flags=re.DOTALL).strip()
                 if match:
                     chart_spec = json.loads(match.group(1).strip())
+                # judge fires here - before returning to dj_data for chart rendering and response to user prompt
+                verdict = evaluate(question, produced_query, clean_text)
                 break
 
     except Exception as e:
         logger.error(f"Error in ask(): {e}")
         return {"raw_data": None, "natural_language_response": f"Error: {str(e)}", "chart_spec": None}
 
-    return {"raw_data": query_result, "natural_language_response": clean_text, "chart_spec": chart_spec}
+    return {"raw_data": query_result, "natural_language_response": clean_text, "chart_spec": chart_spec, "generated_sql": produced_query, "verdict": verdict}
