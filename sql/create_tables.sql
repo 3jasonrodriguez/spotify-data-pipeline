@@ -65,3 +65,25 @@ CREATE TABLE IF NOT EXISTS public.llm_eval_log (
     reasoning TEXT,
     flags TEXT[]
 );
+
+CREATE TABLE IF NOT EXISTS public.insights (
+    insight_key SERIAL PRIMARY KEY,
+    generated_at TIMESTAMP DEFAULT NOW(),
+    user_scope VARCHAR(50),
+    insight_text TEXT,
+    follow_up_question TEXT,
+    used BOOLEAN DEFAULT FALSE,
+    chart_spec JSONB;
+);
+
+CREATE TABLE IF NOT EXISTS public.discovery_eval_log(
+    eval_key SERIAL PRIMARY KEY,
+    evaluated_at TIMESTAMP DEFAULT NOW(),
+    user_scope VARCHAR(50),
+    insight_text TEXT,
+    follow_up_question TEXT,
+    passed BOOLEAN,
+    score INT,
+    reasoning TEXT,
+    flags TEXT[]
+);

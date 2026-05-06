@@ -9,15 +9,9 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import sql.streamlit_queries as streamlit_queries
 from etl.utils.streamlit_connections import get_postgres_conn
+from etl.utils.db_utils import get_users
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
-
-
-def get_users(conn):
-    query = streamlit_queries.GET_USERS
-    df = pd.read_sql(query, conn)
-    user_list = df['schema_name'].tolist()
-    return user_list
 
 def top_ten_songs(conn, user):
     query = streamlit_queries.TOP_TEN_SONGS.format(user=user)

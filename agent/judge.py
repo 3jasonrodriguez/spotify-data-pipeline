@@ -9,7 +9,7 @@ logger = get_logger(__name__)
 load_dotenv()
 client = anthropic.Anthropic()
 
-JUDGE_SYSTEM_PROMPT = f"""
+JUDGE_SQL_PROMPT = f"""
 You are a PostgreSQL expert evaluating LLM-generated SQL...
 You will serve to evaluate SQL before it is run on a Postgres database.
 The database holds Spotify streaming data for users with users having their own schema using their first name. Each schema and is modeled with a fact table and dimensional tables.
@@ -81,7 +81,7 @@ def log_eval(question: str, generated_sql: str, verdict: dict):
         logger.error(f"Error in evaluate(): {e}")
 
 #LLM call to perform the evaluation of the SQL
-def evaluate(question: str, generated_sql: str, nl_response: str) -> dict:
+def evaluate_sql(question: str, generated_sql: str, nl_response: str) -> dict:
     try:
         messages = [{
             "role": "user",
@@ -96,7 +96,7 @@ def evaluate(question: str, generated_sql: str, nl_response: str) -> dict:
         response = client.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=1024,
-            system=JUDGE_SYSTEM_PROMPT,
+            system=JUDGE_SQL_PROMPT,
             messages=messages
         )
         raw_text = response.content[0].text.strip()
@@ -108,6 +108,87 @@ def evaluate(question: str, generated_sql: str, nl_response: str) -> dict:
         log_eval(question, generated_sql, verdict)
         return verdict
 
+    except Exception as e:
+        logger.error(f"Error in evaluate(): {e}")
+        return {"passed": True, "score": None, "reasoning": "Eval failed", "flags": []}
+    
+JUDGE_DISCOVERY_PROMPT = f"""
+You are a data analyst and quality reviewer evaluating AI-generated insights 
+about Spotify listening data.
+
+## Your Role
+- Evaluate whether the insight is genuinely interesting or surprising
+- Check if the follow-up question is relevant and would lead to more discovery
+- Verify the chart spec is appropriate for the data being described
+- Ensure the insight is specific and data-driven, not generic
+
+## Scoring
+- 5: Genuinely surprising, specific, actionable insight
+- 4: Interesting and relevant, minor improvements possible
+- 3: Acceptable but somewhat generic or obvious
+- 1-2: Generic, obvious, or not data-driven
+
+Only approve scores of 3 and above.
+
+## Database Schema
+{JUDGE_CONTEXT}
+
+Return ONLY a valid JSON verdict:
+{{
+    "passed": true/false,
+    "score": 1-5,
+    "reasoning": "explanation",
+    "flags": ["generic insight", "irrelevant follow-up", ...]
+}}
+"""
+#Used for writing the verdict to Postgres for feedback analysis
+def discovery_eval_log(insight_text: str, follow_up_question: str, user_scope: str, verdict: dict):
+    try:
+        with get_postgres_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO public.discovery_eval_log 
+                    (insight_text, follow_up_question, user_scope, passed, score, reasoning, flags)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    insight_text,
+                    follow_up_question,
+                    user_scope,
+                    verdict.get("passed"),
+                    verdict.get("score"),
+                    verdict.get("reasoning"),
+                    verdict.get("flags")
+                ))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error in evaluate(): {e}")
+
+def evaluate_discovery(insight_text: str , follow_up_question: str, chart_spec: dict) -> dict:
+    try:
+        messages = [{
+            "role": "user",
+            "content": f"""
+            Insight Text: {insight_text}
+            Follow up question: {follow_up_question}
+            Chart Spec: {chart_spec}
+            Return your verdict as JSON only, no other text.
+            """
+        }]
+        #Give the LLM the prompt and create the message
+        response = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=1024,
+            system=JUDGE_DISCOVERY_PROMPT,
+            messages=messages
+        )
+        raw_text = response.content[0].text.strip()
+        #strip markdown code blocks produced from LLM response if present
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r'```json|```', '', raw_text).strip()
+        verdict = json.loads(raw_text)
+        # write to postgres
+        discovery_eval_log(insight_text, follow_up_question, user_scope, verdict)
+        return verdict
     except Exception as e:
         logger.error(f"Error in evaluate(): {e}")
         return {"passed": True, "score": None, "reasoning": "Eval failed", "flags": []}

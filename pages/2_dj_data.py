@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import matplotlib.pyplot as plt
 import sql.streamlit_queries as streamlit_queries
 from etl.utils.streamlit_connections import get_postgres_conn
+from etl.utils.db_utils import get_users
 from etl.utils.logger import get_logger 
 from agent.orchestrator import ask
 logger = get_logger(__name__)
@@ -40,13 +41,6 @@ def response_generator(response):
     for word in response.split():
         yield word + " "
         time.sleep(0.05)
-
-def get_users(conn):
-    query = streamlit_queries.GET_USERS
-    df = pd.read_sql(query, conn)
-    user_list = df['schema_name'].tolist()
-    user_list.append("All Users")
-    return user_list
 
 def render_bar_chart(df, spec):
     if spec.get('title'):
@@ -129,7 +123,6 @@ def app():
         #Open postgres connection
         with get_postgres_conn() as conn:
 
-            user_list_options = get_users(conn)
             #Available user selection
             user_scope = st.radio(
                 "Query scope",
