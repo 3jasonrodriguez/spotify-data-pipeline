@@ -1,36 +1,30 @@
 from airflow.sdk import DAG, Param
-from airflow.providers.standard.operators.python import PythonOperator, ShortCircuitOperator
-from airflow.task.trigger_rule import TriggerRule
-from datetime import datetime, timedelta
-
-import sql.streamlit_queries as streamlit_queries
-from etl.utils.db_utils import get_users
-from etl.utils.streamlit_connections import get_postgres_conn
-from agent.discoveries_prompt import get_discoveries_prompt
-from agent.orchestrator 
+from airflow.providers.standard.operators.python import PythonOperator
+from agent.orchestrator import discover
+from datetime import datetime
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
-def get_user_scopes():
-    with get_postgres_conn as conn:
-        user_scopes = get_users(conn)
-    return user_scopes
-#Grabs all current user schemas in postgres to know which users need to have insights generated for extensibility and modularity
-default_args = {
-    'owner': 'airflow',
-    'retries': 3,
-    'retry_delay': timedelta(minutes=5)
-}
-
+#Define user scopes
+USER_SCOPES = ["jason", "kelly", "all_users"]
+#DAG definition
 with DAG(
-    dag_id='spotify_discoveries',
-    default_args=default_args,
+    dag_id="discoveries_dag",
     start_date=datetime(2026, 1, 1),
-    schedule='0 6 * * 0',  # daily at 6am
+    schedule="@weekly",
     catchup=False,
-    params={
-        "user_scope": Param(default="jason", type="string"),
-        "ingest_streaming_history": Param(default=False, type="boolean")
-    }
+    tags=["discoveries", "llm"]
 ) as dag:
-    # tasks go here
+    #Grabs all current user schemas in postgres to know which users need to have discoveries generated for extensibility and modularity
+    discovery_tasks = []
+    for scope in USER_SCOPES:
+        task = PythonOperator(
+            task_id=f"generate_{scope.lower().replace(' ', '_')}_discovery",
+            python_callable=discover,
+            op_kwargs={"user_scope": scope}
+        )
+        discovery_tasks.append(task)
+
+    #Chain the discovery tasks sequentially
+    for i in range(len(discovery_tasks) - 1):
+        discovery_tasks[i] >> discovery_tasks[i + 1]

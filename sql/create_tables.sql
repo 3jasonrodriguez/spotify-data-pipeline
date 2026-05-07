@@ -66,14 +66,14 @@ CREATE TABLE IF NOT EXISTS public.llm_eval_log (
     flags TEXT[]
 );
 
-CREATE TABLE IF NOT EXISTS public.insights (
+CREATE TABLE IF NOT EXISTS public.discoveries (
     insight_key SERIAL PRIMARY KEY,
     generated_at TIMESTAMP DEFAULT NOW(),
     user_scope VARCHAR(50),
     insight_text TEXT,
     follow_up_question TEXT,
     used BOOLEAN DEFAULT FALSE,
-    chart_spec JSONB;
+    chart_spec JSONB
 );
 
 CREATE TABLE IF NOT EXISTS public.discovery_eval_log(

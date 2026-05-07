@@ -163,11 +163,13 @@ def discovery_eval_log(insight_text: str, follow_up_question: str, user_scope: s
     except Exception as e:
         logger.error(f"Error in evaluate(): {e}")
 
-def evaluate_discovery(insight_text: str , follow_up_question: str, chart_spec: dict) -> dict:
+#Judge whether a discovery meets the criteria, is valid, and interesting
+def evaluate_discovery(insight_text: str, follow_up_question: str, chart_spec: dict, user_scope: str) -> dict:
     try:
         messages = [{
             "role": "user",
             "content": f"""
+            User Scope: {user_scope}
             Insight Text: {insight_text}
             Follow up question: {follow_up_question}
             Chart Spec: {chart_spec}
@@ -192,3 +194,22 @@ def evaluate_discovery(insight_text: str , follow_up_question: str, chart_spec: 
     except Exception as e:
         logger.error(f"Error in evaluate(): {e}")
         return {"passed": True, "score": None, "reasoning": "Eval failed", "flags": []}
+
+#Log the approved discovery to postgres
+def log_discovery(user_scope: str, insight_text: str, follow_up_question: str, chart_spec: dict):
+    try:
+        with get_postgres_conn() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO public.discoveries
+                    (user_scope, insight_text, follow_up_question, chart_spec)
+                    VALUES (%s, %s, %s, %s)
+                """, (
+                    user_scope,
+                    insight_text,
+                    follow_up_question,
+                    json.dumps(chart_spec) if chart_spec else None
+                ))
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error logging discovery: {e}")

@@ -2,7 +2,7 @@ import re
 import json
 import anthropic
 from agent.system_prompt import get_system_prompt
-from agent.judge import evaluate_sql, evaluate_discovery, discovery_eval_log
+from agent.judge import evaluate_sql, evaluate_discovery, log_discovery
 from agent.mcp_server import execute_sql
 from etl.utils.logger import get_logger 
 from agent.discoveries_prompt import get_discoveries_prompt
@@ -115,15 +115,15 @@ def discover(user_scope: str) -> dict:
                 follow_up_question = parsed.get("follow_up_question")
                 chart_spec = parsed.get("chart_spec")
                 
-                # judge evaluates the insight
-                verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec)
+                # judge evaluates the discovery
+                verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec, user_scope)
                 
-                # only write to postgres if judge approves
+                # only log to postgres if judge approves
                 if verdict.get("passed"):
-                    discovery_eval_log(user_scope, insight_text, follow_up_question, chart_spec)
+                    log_discovery(user_scope, insight_text, follow_up_question, chart_spec)
                 break
     except Exception as e:
         logger.error(f"Error in ask(): {e}")
-        return {"insight_text": None, "follow_up_question": None, "chart_spec": None}
+        return {"insight_text": None, "follow_up_question": None, "chart_spec": None, "user_scope":None}
 
-    return {"insight_text": insight_text, "follow_up_question": follow_up_question, "chart_spec": chart_spec}
+    return {"insight_text": insight_text, "follow_up_question": follow_up_question, "chart_spec": chart_spec, "user_scope":user_scope}
