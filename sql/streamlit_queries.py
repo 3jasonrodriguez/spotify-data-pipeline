@@ -88,3 +88,10 @@ JOIN {user}.dim_track dt ON fpe.track_key = dt.track_key
 JOIN {user}.dim_artist da ON fpe.artist_key = da.artist_key
 JOIN {user}.bridge_artist_genre bag ON da.artist_key = bag.artist_key
 JOIN {user}.dim_genre dg ON bag.genre_key = dg.genre_key'''
+
+GET_DISCOVERIES='''SELECT * FROM (
+    SELECT *,
+    ROW_NUMBER() OVER (PARTITION BY user_scope ORDER BY generated_at DESC) as rn
+    FROM public.discoveries
+) ranked
+WHERE rn = 1'''

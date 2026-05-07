@@ -120,7 +120,8 @@ def discover(user_scope: str) -> dict:
                 
                 # only log to postgres if judge approves
                 if verdict.get("passed"):
-                    log_discovery(user_scope, insight_text, follow_up_question, chart_spec)
+                    if verdict.get("passed"):
+                        log_discovery(user_scope, insight_text, follow_up_question, chart_spec, produced_query, query_result)
                 break
     except Exception as e:
         logger.error(f"Error in ask(): {e}")

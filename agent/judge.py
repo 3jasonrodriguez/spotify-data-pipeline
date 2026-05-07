@@ -196,19 +196,22 @@ def evaluate_discovery(insight_text: str, follow_up_question: str, chart_spec: d
         return {"passed": True, "score": None, "reasoning": "Eval failed", "flags": []}
 
 #Log the approved discovery to postgres
-def log_discovery(user_scope: str, insight_text: str, follow_up_question: str, chart_spec: dict):
+def log_discovery(user_scope: str, insight_text: str, follow_up_question: str, chart_spec: dict, generated_sql: str, raw_data: dict ):
     try:
         with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO public.discoveries
-                    (user_scope, insight_text, follow_up_question, chart_spec)
-                    VALUES (%s, %s, %s, %s)
+                    (user_scope, insight_text, follow_up_question, chart_spec, generated_sql, raw_data)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                 """, (
                     user_scope,
                     insight_text,
                     follow_up_question,
-                    json.dumps(chart_spec) if chart_spec else None
+                    json.dumps(chart_spec) if chart_spec else None,
+                    generated_sql,
+                    raw_data if raw_data else None
+                    
                 ))
             conn.commit()
     except Exception as e:

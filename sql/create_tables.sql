@@ -73,7 +73,9 @@ CREATE TABLE IF NOT EXISTS public.discoveries (
     insight_text TEXT,
     follow_up_question TEXT,
     used BOOLEAN DEFAULT FALSE,
-    chart_spec JSONB
+    chart_spec JSONB,
+    raw_data JSONB,
+    generated_sql TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.discovery_eval_log(
