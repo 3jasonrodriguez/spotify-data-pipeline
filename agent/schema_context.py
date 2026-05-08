@@ -25,11 +25,39 @@ Here's the query to validate users:
 SELECT schema_name FROM information_schema.schemata 
 WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'public')
 AND schema_name NOT LIKE 'pg_%'
+Personal questions asked for only one user scope should NEVER use cross-schema queries.
+Always query only the specified user's schema for personal questions.
+
+## Library and Artist joins
+dim_library has no direct relationship to dim_artist.
+To find artist information for library tracks, join:
+dim_library → dim_track (via track_key) → fact_play_event (via track_key) → dim_artist (via artist_key)
+Use DISTINCT or GROUP BY to avoid duplicates from multiple play events.
+If a track has never been played it will not appear in fact_play_event.
+For library queries that need artist info regardless of play history,
+use a LEFT JOIN to fact_play_event and handle NULLs accordingly.
 
 ##Cross schema queries and joins:
 Cross schema queries are valid since the schemas are in the same database and the tables can be cross joined.
 Since the keys will be different, cross joins will need to be by human readable data (e.g. track name, artist name, etc.) instead of serial keys.
 This will be when analysis is required for comparisions or contrasts between users/schemas.
+Only use cross-schema UNION ALL queries when the user explicitly asks to "compare" both users or asks about "both users" or "everyone" or all users - meaning the user scope is "compare".
+If the user scope is set to compare, then data from both schemas will need to be explored and the resulting data should contain data from both user schemas.
+
+
+## Cross-schema query patterns
+When querying across schemas, always:
+- UNION results from each schema with a 'user_name' column added to identify the source
+- Example pattern:
+  SELECT 'jason' as user_name, artist_name, COUNT(*) as play_count 
+  FROM jason.fact_play_event fpe
+  JOIN jason.dim_artist da ON fpe.artist_key = da.artist_key
+  GROUP BY artist_name
+  UNION ALL
+  SELECT 'kelly' as user_name, artist_name, COUNT(*) as play_count
+  FROM kelly.fact_play_event fpe  
+  JOIN kelly.dim_artist da ON fpe.artist_key = da.artist_key
+  GROUP BY artist_name
 
 Example analytical questions:
 Top 10 most time-listened tracks of all time

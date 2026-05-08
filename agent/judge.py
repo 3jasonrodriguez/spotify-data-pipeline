@@ -60,28 +60,29 @@ Example JSON output:
 """
 
 #Used for writing the verdict to Postgres for feedback analysis
-def log_eval(question: str, generated_sql: str, verdict: dict):
+def log_eval(question: str, generated_sql: str, verdict: dict, user_scope: str = None):
     try:
         with get_postgres_conn() as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
                     INSERT INTO public.llm_eval_log 
-                    (question, generated_sql, passed, score, reasoning, flags)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    (question, generated_sql, passed, score, reasoning, flags, user_scope)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (
                     question,
                     generated_sql,
                     verdict.get("passed"),
                     verdict.get("score"),
                     verdict.get("reasoning"),
-                    verdict.get("flags")
+                    verdict.get("flags"),
+                    user_scope
                 ))
             conn.commit()
     except Exception as e:
         logger.error(f"Error in evaluate(): {e}")
 
 #LLM call to perform the evaluation of the SQL
-def evaluate_sql(question: str, generated_sql: str, nl_response: str) -> dict:
+def evaluate_sql(question: str, generated_sql: str, nl_response: str, user_scope: str = None) -> dict:
     try:
         messages = [{
             "role": "user",
@@ -89,6 +90,7 @@ def evaluate_sql(question: str, generated_sql: str, nl_response: str) -> dict:
             Question: {question}
             Generated SQL: {generated_sql}
             Natural Language Response: {nl_response}
+            User Scope: {user_scope}
             Return your verdict as JSON only, no other text.
             """
         }]
@@ -105,7 +107,7 @@ def evaluate_sql(question: str, generated_sql: str, nl_response: str) -> dict:
             raw_text = re.sub(r'```json|```', '', raw_text).strip()
         verdict = json.loads(raw_text)
         # write to postgres
-        log_eval(question, generated_sql, verdict)
+        log_eval(question, generated_sql, verdict, user_scope)
         return verdict
 
     except Exception as e:

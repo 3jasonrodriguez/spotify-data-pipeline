@@ -1,4 +1,4 @@
-from airflow.sdk import DAG, Param
+from airflow.sdk import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 from agent.orchestrator import discover
 from datetime import datetime
@@ -6,10 +6,10 @@ from etl.utils.logger import get_logger
 logger = get_logger(__name__)
 
 #Define user scopes
-USER_SCOPES = ["jason", "kelly", "all_users"]
+USER_SCOPES = ["jason", "kelly", "compare"]
 #DAG definition
 with DAG(
-    dag_id="discoveries_dag",
+    dag_id="spotify_discoveries",
     start_date=datetime(2026, 1, 1),
     schedule="@weekly",
     catchup=False,

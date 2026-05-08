@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS public.llm_eval_log (
     passed BOOLEAN,
     score INT,
     reasoning TEXT,
-    flags TEXT[]
+    flags TEXT[],
+    user_scope VARCHAR(50)
 );
 
 CREATE TABLE IF NOT EXISTS public.discoveries (

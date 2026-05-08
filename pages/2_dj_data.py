@@ -11,13 +11,22 @@ from etl.utils.logger import get_logger
 from agent.orchestrator import ask
 logger = get_logger(__name__)
 import time
-PROMOTED_QUESTIONS = [
+PROMOTED_QUESTIONS_SINGLE = [
     "Who are my top 10 most played artists?",
     "What is my listening history over time by genre?",
     "What are my top 10 tracks played during work hours?",
     "What is my total listening time per year?",
     "What saved library tracks have I never played?",
     "What is my longest consecutive listening streak by track?"
+]
+
+PROMOTED_QUESTIONS_COMPARE = [
+    "Who are the top 10 most played artists for both Jason and Kelly?",
+    "How does Jason and Kelly's listening history compare over time by genre?",
+    "What are the top 10 tracks played during work hours for Jason vs Kelly?",
+    "How does Jason and Kelly's total listening time per year compare?",
+    "What saved library tracks has neither Jason nor Kelly ever played?",
+    "Who has the longest consecutive listening streak — Jason or Kelly?"
 ]
 
 def app():
@@ -43,9 +52,11 @@ def app():
                 options=get_users(conn),
                 horizontal=True
             )
-            #Display promoted questions
+            #Display promoted questions based on user scope
             cols = st.columns(3)
-            for i, question in enumerate(PROMOTED_QUESTIONS):
+            questions = PROMOTED_QUESTIONS_COMPARE if user_scope == "compare" else PROMOTED_QUESTIONS_SINGLE
+
+            for i, question in enumerate(questions):
                 if cols[i % 3].button(question, use_container_width=True):
                     st.session_state.current_question = question
                     st.session_state.trigger_ask = True

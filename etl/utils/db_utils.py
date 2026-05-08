@@ -5,5 +5,5 @@ def get_users(conn):
     query = streamlit_queries.GET_USERS
     df = pd.read_sql(query, conn)
     user_list = df['schema_name'].tolist()
-    user_list.append("all_users")
+    user_list.append("compare")
     return user_list

@@ -1,7 +1,7 @@
 from agent.schema_context import SCHEMA_CONTEXT
 
 def get_discoveries_prompt(user_scope: str) -> str:
-    if user_scope == "All Users":
+    if user_scope == "compare":
         scope_instruction = """The user wants to compare data across all user schemas. 
         Use cross-schema queries joining by human readable fields like track_name and artist_name.
         Always clarify which user each result belongs to in your response."""

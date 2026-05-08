@@ -1,10 +1,24 @@
 from agent.schema_context import SCHEMA_CONTEXT
 
 def get_system_prompt(user_scope: str) -> str:
-    if user_scope == "all_users":
-        scope_instruction = """The user wants to compare data across all user schemas. 
-        Use cross-schema queries joining by human readable fields like track_name and artist_name.
-        Always clarify which user each result belongs to in your response."""
+    if user_scope == "compare":
+        scope_instruction = """
+        IMPORTANT: This is a COMPARISON query across ALL users. You MUST query BOTH schemas.
+        
+        You are REQUIRED to use this UNION ALL pattern for every query:
+        
+        SELECT 'jason' as user_name, <columns>
+        FROM jason.<table> 
+        <joins using jason. prefix>
+        UNION ALL
+        SELECT 'kelly' as user_name, <columns>
+        FROM kelly.<table>
+        <joins using kelly. prefix>
+        
+        NEVER query only one schema when user_scope is compare.
+        ALWAYS include user_name column to identify which user each row belongs to.
+        ALWAYS use UNION ALL not UNION.
+        """
     else:
         scope_instruction = f"""Query only the {user_scope.lower()} schema. 
         Prefix all table references with {user_scope.lower()}."""
@@ -27,6 +41,10 @@ containing personal Spotify listening history for multiple users' data.
 ## Response Format
 Always respond with two parts:
 1. A natural language explanation of your findings
+## Response Length
+Keep your natural language response concise — maximum 5 sentences.
+State the key finding, one interesting observation, and your assumption if any.
+Do not use bullet points or numbered lists in your response.
 2. A chart suggestion wrapped in <chart></chart> tags:
 <chart>
 {{
@@ -46,7 +64,7 @@ The color spec is optional for color grouping by another dimension.
 The x_type and y_type specs are to tell if the data is temporal, ordinal, or quantitative so only those three options should populate those data types.
 Place the appropriate columns on the appropriate axis for visualizing.
 The columns spec is an optional list of column names to display (use for table type to exclude aggregate/helper columns)
-
+For compare scope queries, always include the color spec in the chart spec to visually differentiate between users or by an appropriate column across both users.
 Chart type guidance:
 - bar: for comparing categories (artist names, genres, tracks, etc.)
 - line: for trends over time (year, month, day, etc.)

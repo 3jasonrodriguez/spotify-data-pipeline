@@ -44,7 +44,6 @@ def ask(question: str, user_scope: str) -> dict:
                 tools=TOOLS,
                 messages=messages
             )
-
             if response.stop_reason == "tool_use":
                 tool_use = next(b for b in response.content if b.type == "tool_use")
                 produced_query = tool_use.input.get('query')
@@ -67,7 +66,7 @@ def ask(question: str, user_scope: str) -> dict:
                 if match:
                     chart_spec = json.loads(match.group(1).strip())
                 # judge fires here - before returning to dj_data for chart rendering and response to user prompt
-                verdict = evaluate_sql(question, produced_query, clean_text)
+                verdict = evaluate_sql(question, produced_query, clean_text, user_scope)
                 break
 
     except Exception as e:

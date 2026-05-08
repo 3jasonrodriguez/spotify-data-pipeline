@@ -39,7 +39,11 @@ services:
         condition: service_healthy
     networks:
       - spotify-network
-
+  landing:
+    build: ./landing
+    ports:
+        - "8080:8080"
+    restart: unless-stopped
 
 volumes:
   postgres-db-volume:
@@ -47,3 +51,5 @@ networks:
   spotify-network:
     name: spotify-network
     driver: bridge
+
+

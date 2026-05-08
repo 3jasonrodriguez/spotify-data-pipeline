@@ -14,8 +14,6 @@ def get_discoveries(conn):
     query = streamlit_queries.GET_DISCOVERIES
     df = pd.read_sql(query, conn)
     return df
-    #for scope in ["jason", "kelly", "all_users"]:
-        #scope_df = df[df["user_scope"] == scope]
 
 def app():
     #Render the Visualizations
@@ -66,7 +64,7 @@ def app():
             col1 = st.columns(1)
             # fix - full width doesn't need columns at all
             st.divider()  # visual separator
-            scope_row = discoveries_df[discoveries_df["user_scope"] == "all_users"]
+            scope_row = discoveries_df[discoveries_df["user_scope"] == "compare"]
             if not scope_row.empty:
                 row = scope_row.iloc[0]
                 with st.container(border=True):
@@ -74,7 +72,7 @@ def app():
                     st.write(row["insight_text"])
                     raw_data_df = pd.DataFrame(row["raw_data"]) if row["raw_data"] else pd.DataFrame()
                     render_chart(raw_data_df, row["chart_spec"])
-                    if st.button("💡 Explore further", key="explore_all_users"):
+                    if st.button("💡 Explore further", key="explore_compare"):
                         st.session_state.current_question = row["follow_up_question"]
                         st.session_state.trigger_ask = True
                         st.switch_page("pages/2_dj_data.py")
@@ -83,7 +81,7 @@ def app():
                     st.info("No discoveries yet for comparison.")
                     
 
-# bottom half - all_users full width
+# bottom half - compare full width
 # your turn - follow the same pattern
 
     except psycopg2.Error as e:
