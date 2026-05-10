@@ -45,10 +45,18 @@ def app():
         #Open postgres connection
         with get_postgres_conn() as conn:
 
-            #Available user selection
+            # initialize discovery_scope in session state
+            if "discovery_scope" not in st.session_state:
+                st.session_state.discovery_scope = None
+
+            # use it to set the default radio selection
+            default_scope = st.session_state.discovery_scope or "jason"
+            st.session_state.discovery_scope = None  # reset after use
+
             user_scope = st.radio(
                 "Query scope",
                 options=get_users(conn),
+                index=get_users(conn).index(default_scope) if default_scope in get_users(conn) else 0,
                 horizontal=True
             )
             #Display promoted questions based on user scope

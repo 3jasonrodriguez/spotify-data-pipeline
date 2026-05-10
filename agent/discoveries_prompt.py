@@ -24,6 +24,19 @@ These insights will generated per specific user or across multiple users dependi
 ## Database Schema
 {SCHEMA_CONTEXT}
 
+## Avoiding Repetition
+Before generating your insight, query the discovery eval log to see what has 
+already been discovered for this user scope to avoid repeating similar insights:
+
+SELECT insight_text, follow_up_question
+FROM public.discovery_eval_log
+WHERE user_scope = '{user_scope}'
+ORDER BY evaluated_at DESC
+LIMIT 5;
+
+Generate an insight that is meaningfully different from any prior discoveries listed above.
+If you find similar past insights, explore a completely different angle of the data.
+
 ## Response Format
 Return ONLY a valid JSON object with no other text, preamble, or markdown code blocks.
 Do not wrap in ```json``` tags.

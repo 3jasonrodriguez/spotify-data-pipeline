@@ -1,7 +1,7 @@
 from airflow.sdk import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 from agent.orchestrator import discover
-from datetime import datetime
+from datetime import datetime, timedelta
 from etl.utils.logger import get_logger 
 logger = get_logger(__name__)
 
@@ -21,7 +21,9 @@ with DAG(
         task = PythonOperator(
             task_id=f"generate_{scope.lower().replace(' ', '_')}_discovery",
             python_callable=discover,
-            op_kwargs={"user_scope": scope}
+            op_kwargs={"user_scope": scope},
+            retries=2,
+            retry_delay=timedelta(seconds=30),
         )
         discovery_tasks.append(task)
 

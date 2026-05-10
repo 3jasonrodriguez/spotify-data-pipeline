@@ -21,9 +21,11 @@ def show_discovery(row):
     st.write(row["insight_text"])
     raw_data_df = pd.DataFrame(row["raw_data"]) if row["raw_data"] else pd.DataFrame()
     render_chart(raw_data_df, row["chart_spec"])
+    # in show_discovery() dialog
     if st.button("💡 Explore further", key=f"dialog_explore_{scope}"):
         st.session_state.current_question = row["follow_up_question"]
         st.session_state.trigger_ask = True
+        st.session_state.discovery_scope = row["user_scope"]  # add this
         st.switch_page("pages/2_dj_data.py")
 
 def app():

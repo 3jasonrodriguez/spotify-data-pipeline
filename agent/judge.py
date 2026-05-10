@@ -141,7 +141,7 @@ Flag examples for chart mismatches:
 - 3: Acceptable but somewhat generic or obvious
 - 1-2: Generic, obvious, or not data-driven
 
-Only approve scores of 3 and above.
+Only approve scores of 2 and above.
 
 ## Database Schema
 {JUDGE_CONTEXT}
