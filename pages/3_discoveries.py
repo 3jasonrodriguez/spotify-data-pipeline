@@ -47,8 +47,11 @@ def app():
             discoveries_df = get_discoveries(conn)
             discoveries_df['generated_at'] = pd.to_datetime(discoveries_df['generated_at'])
             latest_date = discoveries_df['generated_at'].max().date()
-            latest_df = discoveries_df[discoveries_df['generated_at'].dt.date == latest_date]
-            past_df = discoveries_df[discoveries_df['generated_at'].dt.date < latest_date]
+            # get the most recent record per user_scope
+            latest_df = discoveries_df.sort_values('generated_at', ascending=False).groupby('user_scope').first().reset_index()
+            # past = everything that's not the latest per scope
+            latest_keys = latest_df['insight_key'].tolist()
+            past_df = discoveries_df[~discoveries_df['insight_key'].isin(latest_keys)]
             # top half - jason and kelly side by side
             col1, col2 = st.columns(2)
             for scope, col in [("jason", col1), ("kelly", col2)]:
