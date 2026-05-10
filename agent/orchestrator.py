@@ -27,6 +27,16 @@ TOOLS = [
         }
     }
 ]
+
+def parse_json_response(text: str) -> dict:
+    """Extract JSON from LLM response regardless of surrounding text or markdown."""
+    raw = re.sub(r'```json|```', '', text).strip()
+    json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if json_match:
+        return json.loads(json_match.group())
+    raise ValueError("No JSON found in LLM response")
+
+
 def get_cached_sql(question: str, user_scope: str) -> dict | None:
     try:
         with get_postgres_conn() as conn:
@@ -114,7 +124,7 @@ def ask(question: str, user_scope: str) -> dict:
                 #parse for chart
                 match = re.search(r'<chart>(.*?)</chart>', final_text, re.DOTALL)
                 if match:
-                    chart_spec = json.loads(match.group(1).strip())
+                    chart_spec = parse_json_response(match.group(1))
 
                 # only judge if it's a data response
                 if response_type == "data":
@@ -143,7 +153,7 @@ def discover(user_scope: str) -> dict:
         while True:
             response = client.messages.create(
                 model="claude-sonnet-4-5",
-                max_tokens=1024,
+                max_tokens=2048,
                 system=get_discoveries_prompt(user_scope),
                 tools=TOOLS, # not sure I need this
                 messages=messages
@@ -164,23 +174,15 @@ def discover(user_scope: str) -> dict:
                 })
             elif response.stop_reason == "end_turn":
                 final_text = next(b.text for b in response.content if hasattr(b, "text"))
-                # strip markdown code blocks if present
-                raw_text = final_text.strip()
-                if raw_text.startswith("```"):
-                    raw_text = re.sub(r'```json|```', '', raw_text).strip()
-                print(f"RAW DISCOVER RESPONSE: {raw_text[:500]}")
-                parsed = json.loads(raw_text)
+                parsed = parse_json_response(final_text)
                 insight_text = parsed.get("insight_text")
                 follow_up_question = parsed.get("follow_up_question")
                 chart_spec = parsed.get("chart_spec")
-                
                 # judge evaluates the discovery
                 verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec, user_scope)
-                
                 # only log to postgres if judge approves
                 if verdict.get("passed"):
-                    if verdict.get("passed"):
-                        log_discovery(user_scope, insight_text, follow_up_question, chart_spec, produced_query, query_result)
+                    log_discovery(user_scope, insight_text, follow_up_question, chart_spec, produced_query, query_result)
                 break
     except Exception as e:
         logger.error(f"Error in ask(): {e}")
