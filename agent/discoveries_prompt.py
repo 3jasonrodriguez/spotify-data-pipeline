@@ -32,7 +32,7 @@ SELECT insight_text, follow_up_question
 FROM public.discovery_eval_log
 WHERE user_scope = '{user_scope}'
 ORDER BY evaluated_at DESC
-LIMIT 5;
+LIMIT 3;
 
 Generate an insight that is meaningfully different from any prior discoveries listed above.
 If you find similar past insights, explore a completely different angle of the data.
