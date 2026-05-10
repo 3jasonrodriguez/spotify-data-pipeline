@@ -168,7 +168,7 @@ def discover(user_scope: str) -> dict:
                 raw_text = final_text.strip()
                 if raw_text.startswith("```"):
                     raw_text = re.sub(r'```json|```', '', raw_text).strip()
-                
+                print(f"RAW DISCOVER RESPONSE: {raw_text[:500]}")
                 parsed = json.loads(raw_text)
                 insight_text = parsed.get("insight_text")
                 follow_up_question = parsed.get("follow_up_question")
