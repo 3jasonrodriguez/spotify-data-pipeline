@@ -189,9 +189,21 @@ def discover(user_scope: str) -> dict:
                 insight_text = parsed.get("insight_text")
                 follow_up_question = parsed.get("follow_up_question")
                 chart_spec = parsed.get("chart_spec")
+                
+                # validate chart spec columns match raw data
+                if chart_spec and query_result:
+                    raw_data = json.loads(query_result)
+                    if raw_data:
+                        actual_columns = list(raw_data[0].keys())
+                        x_col = chart_spec.get('x')
+                        y_col = chart_spec.get('y')
+                        if x_col not in actual_columns or y_col not in actual_columns:
+                            logger.warning(f"Chart spec mismatch — x:{x_col} y:{y_col} not in {actual_columns}")
+                            chart_spec = None
+                
                 # judge evaluates the discovery
                 verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec, user_scope)
-                # only log to postgres if judge approves
+                
                 if verdict.get("passed"):
                     log_discovery(user_scope, insight_text, follow_up_question, chart_spec, produced_query, query_result)
                 break
