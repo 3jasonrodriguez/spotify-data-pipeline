@@ -13,20 +13,19 @@ logger = get_logger(__name__)
 import time
 PROMOTED_QUESTIONS_SINGLE = [
     "Who are my top 10 most played artists?",
-    "What is my listening history over time by genre?",
-    "What are my top 10 tracks played during work hours?",
-    "What is my total listening time per year?",
-    "What saved library tracks have I never played?",
-    "What is my longest consecutive listening streak by track?"
+    "Which artists have I recently discovered in the last year?",
+    "How has my average listening session length changed over the years?",
+    "Which tracks have I played more than 50 times?",
+    "What are my most skipped tracks based on short play times?"
 ]
 
 PROMOTED_QUESTIONS_COMPARE = [
-    "Who are the top 10 most played artists for both Jason and Kelly?",
-    "How does Jason and Kelly's listening history compare over time by genre?",
-    "What are the top 10 tracks played during work hours for Jason vs Kelly?",
-    "How does Jason and Kelly's total listening time per year compare?",
-    "What saved library tracks has neither Jason nor Kelly ever played?",
-    "Who has the longest consecutive listening streak — Jason or Kelly?"
+    "Which artists do both Jason and Kelly listen to the most?",
+    "Who discovered new genres first — Jason or Kelly?",
+    "Which user has the more diverse music taste by genre count?",
+    "How do listening patterns differ from morning, afternoon, and evening across users?",
+    "Who has grown their music library faster over the years?",
+    "Who tends to listen to songs over and over again more often?"
 ]
 
 def app():
@@ -72,8 +71,13 @@ def app():
                 st.write(f"Asking: {prompt}")
                 with st.spinner("DJ Data is thinking..."):
                     ask_response = ask(prompt, user_scope)
+                    response_type = ask_response.get("response_type")
                     verdict = ask_response.get("verdict")
-                    if verdict and not verdict.get("passed"):
+                    if response_type == "out_of_scope":
+                        st.info("🎵 DJ Data can only answer questions about your personal Spotify listening history. Try asking about your artists, genres, listening habits, or library!")
+                    elif response_type == "error":
+                        st.error("Something went wrong — please try rephrasing your question.")
+                    elif verdict and not verdict.get("passed"):
                         st.warning("⚠️ DJ Data isn't fully confident in this answer — consider rephrasing your question.")
                         st.info("💡 If you used a suggested question, try clicking it again — DJ Data may generate a better query on the next attempt.")
                     else:

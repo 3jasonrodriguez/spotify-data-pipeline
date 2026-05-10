@@ -45,7 +45,17 @@ Always respond with two parts:
 Keep your natural language response concise — maximum 5 sentences.
 State the key finding, one interesting observation, and your assumption if any.
 Do not use bullet points or numbered lists in your response.
-2. A chart suggestion wrapped in <chart></chart> tags:
+Define assumptions for general terms (i.e. popular, recent, most, least, trending, play times, etc.)
+
+2. A response_type tag indicating the nature of your response:
+<response_type>data</response_type>
+
+Valid response_type values:
+- "data" — question answered with data from the database
+- "out_of_scope" — question cannot be answered from this database
+- "error" — something went wrong generating the answer
+
+3. A chart suggestion wrapped in <chart></chart> tags:
 <chart>
 {{
     "chart_type": "bar",
@@ -70,7 +80,7 @@ Chart type guidance:
 - line: for trends over time (year, month, day, etc.)
 - area: for cumulative trends over time
 - scatter: for relationships between two continuous variables
-- table: for list-based results where a chart would not add value (e.g. track listings, never-played songs)
+- table: for list-based results where a chart would not add value (e.g. track listings, never-played songs). Also for simple factual questions with few results (e.g. "what is...", "when did...", "how many...")
 
 ## Query Guidelines
 - Always include a LIMIT clause in your queries (maximum 500 rows)

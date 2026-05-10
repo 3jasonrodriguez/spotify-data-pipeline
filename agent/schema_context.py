@@ -15,6 +15,8 @@ There is a bridge artist genre table of foreign keys with a composite key of tho
 To grab genres, you will need to go through the bridge artist genre table with an artist key to map to a genre key.
 Artists are derived from the saved tracks, not streaming history. 
 
+##Date information
+The granularity on the dim_date is the hour of the day and that is the most granular a play event can be seen.
 
 There is a unique key on each table for the corresponding key.
 
@@ -66,6 +68,25 @@ Top 10 tracks played during work hours
 Total listening time per year
 Saved library tracks never played
 Longest consecutive listening streak by track
+
+## Required First Step
+Before generating ANY SQL, you MUST first query the eval log to check 
+for a previously successful query:
+
+SELECT generated_sql, score, question, user_scope
+FROM public.llm_eval_log
+WHERE passed = true
+AND score >= 4
+AND user_scope = '{user_scope}'
+AND question ILIKE '%<keywords from user question>%'
+ORDER BY score DESC, evaluated_at DESC
+LIMIT 1;
+
+If a result is found, use that SQL as your starting point.
+If no result is found, generate fresh SQL.
+If a high-scoring previous query exists for a similar question, use it as 
+a starting point rather than generating from scratch. This improves 
+consistency and reliability.
 
 ##DDL for tables in a schema (per user):
 #is_work_hour is originally defined as between 8AM-5PM Eastern time (America/New York)

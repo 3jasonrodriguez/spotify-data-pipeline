@@ -11,4 +11,4 @@ def index():
     return FileResponse(os.path.join(os.path.dirname(__file__), "index.html"))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8090)

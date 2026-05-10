@@ -6,6 +6,7 @@ from agent.judge import evaluate_sql, evaluate_discovery, log_discovery
 from agent.mcp_server import execute_sql
 from etl.utils.logger import get_logger 
 from agent.discoveries_prompt import get_discoveries_prompt
+from etl.utils.connections import get_postgres_conn
 from dotenv import load_dotenv
 load_dotenv()
 logger = get_logger(__name__)
@@ -26,6 +27,38 @@ TOOLS = [
         }
     }
 ]
+def get_cached_sql(question: str, user_scope: str) -> dict | None:
+    try:
+        with get_postgres_conn() as conn:
+            with conn.cursor() as cursor:
+                # extract keywords from question
+                keywords = question.split()
+                # build ILIKE pattern from first few meaningful words
+                pattern = f"%{' '.join(keywords[:4])}%"
+                
+                cursor.execute("""
+                    SELECT generated_sql, score, question
+                    FROM public.llm_eval_log
+                    WHERE passed = true
+                    AND score >= 4
+                    AND user_scope = %s
+                    AND question ILIKE %s
+                    ORDER BY score DESC, evaluated_at DESC
+                    LIMIT 1
+                """, (user_scope, pattern))
+                
+                row = cursor.fetchone()
+                if row:
+                    return {
+                        "generated_sql": row[0],
+                        "score": row[1],
+                        "question": row[2]
+                    }
+                return None
+    except Exception as e:
+        logger.error(f"Error fetching cached SQL: {e}")
+        return None
+
 client = anthropic.Anthropic()
 #Function for prompting analysis questions
 def ask(question: str, user_scope: str) -> dict:
@@ -33,8 +66,19 @@ def ask(question: str, user_scope: str) -> dict:
         chart_spec = None
         produced_query = None
         query_result = None
-        messages = [{"role": "user", "content": question}]
+        # before building messages, check for prior answer to a question for a hint at the sql to execute
+        cached = get_cached_sql(question, user_scope)
+        if cached:
+            enhanced_question = f"""{question}
 
+        Hint: A similar question was previously answered successfully with this SQL (score {cached['score']}/5):
+        {cached['generated_sql']}
+
+        Use this as a starting point if appropriate."""
+        else:
+            enhanced_question = question
+
+        messages = [{"role": "user", "content": enhanced_question}]
         # agentic loop - keeps going until LLM says end_turn
         while True:
             response = client.messages.create(
@@ -61,19 +105,30 @@ def ask(question: str, user_scope: str) -> dict:
 
             elif response.stop_reason == "end_turn":
                 final_text = next(b.text for b in response.content if hasattr(b, "text"))
+                
+                # parse response type first
+                type_match = re.search(r'<response_type>(.*?)</response_type>', final_text, re.DOTALL)
+                response_type = type_match.group(1).strip() if type_match else "data"
+                clean_text = re.sub(r'<response_type>.*?</response_type>', '', final_text, flags=re.DOTALL).strip()
+                clean_text = re.sub(r'<chart>.*?</chart>', '', clean_text, flags=re.DOTALL).strip()
+                #parse for chart
                 match = re.search(r'<chart>(.*?)</chart>', final_text, re.DOTALL)
-                clean_text = re.sub(r'<chart>.*?</chart>', '', final_text, flags=re.DOTALL).strip()
                 if match:
                     chart_spec = json.loads(match.group(1).strip())
-                # judge fires here - before returning to dj_data for chart rendering and response to user prompt
-                verdict = evaluate_sql(question, produced_query, clean_text, user_scope)
+
+                # only judge if it's a data response
+                if response_type == "data":
+                    verdict = evaluate_sql(question, produced_query, clean_text, user_scope)
+                else:
+                    verdict = {"passed": True, "score": None, "reasoning": "Non-data response", "flags": []}
+                
                 break
 
     except Exception as e:
         logger.error(f"Error in ask(): {e}")
         return {"raw_data": None, "natural_language_response": f"Error: {str(e)}", "chart_spec": None}
 
-    return {"raw_data": query_result, "natural_language_response": clean_text, "chart_spec": chart_spec, "generated_sql": produced_query, "verdict": verdict}
+    return {"raw_data": query_result, "natural_language_response": clean_text, "chart_spec": chart_spec, "generated_sql": produced_query, "verdict": verdict, "response_type":response_type}
 
 def discover(user_scope: str) -> dict:
     try:
