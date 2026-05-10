@@ -164,7 +164,12 @@ def discover(user_scope: str) -> dict:
                 })
             elif response.stop_reason == "end_turn":
                 final_text = next(b.text for b in response.content if hasattr(b, "text"))
-                parsed = json.loads(final_text.strip())
+                # strip markdown code blocks if present
+                raw_text = final_text.strip()
+                if raw_text.startswith("```"):
+                    raw_text = re.sub(r'```json|```', '', raw_text).strip()
+                
+                parsed = json.loads(raw_text)
                 insight_text = parsed.get("insight_text")
                 follow_up_question = parsed.get("follow_up_question")
                 chart_spec = parsed.get("chart_spec")

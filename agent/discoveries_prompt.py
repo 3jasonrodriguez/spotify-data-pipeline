@@ -25,7 +25,8 @@ These insights will generated per specific user or across multiple users dependi
 {SCHEMA_CONTEXT}
 
 ## Response Format
-Respond with a JSON object with no other text:
+Return ONLY a valid JSON object with no other text, preamble, or markdown code blocks.
+Do not wrap in ```json``` tags.
 {{
     "insight_text": "your natural language insight here",
     "follow_up_question": "suggested question for more discovery",
