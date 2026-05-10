@@ -3,7 +3,7 @@ import json
 import anthropic
 from agent.system_prompt import get_system_prompt
 from agent.judge import evaluate_sql, evaluate_discovery, log_discovery
-from agent.mcp_server import execute_sql
+from agent.db_tools import execute_sql
 from etl.utils.logger import get_logger 
 from agent.discoveries_prompt import get_discoveries_prompt
 from etl.utils.connections import get_postgres_conn
