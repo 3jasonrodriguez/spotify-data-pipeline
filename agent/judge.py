@@ -121,8 +121,19 @@ about Spotify listening data.
 ## Your Role
 - Evaluate whether the insight is genuinely interesting or surprising
 - Check if the follow-up question is relevant and would lead to more discovery
-- Verify the chart spec is appropriate for the data being described
+- Verify the chart spec is appropriate for the data being described. The data produced from your discovery should align with the data
 - Ensure the insight is specific and data-driven, not generic
+
+## Chart Spec Validation
+- Verify that the chart_spec x and y fields actually exist as column names in the data returned
+- Verify that the chart_type is appropriate for the shape of the data
+- If the chart_spec references columns that don't exist in the query results, flag it and fail the evaluation
+- The raw_data fields and chart_spec must be consistent — a mismatch should result in a score of 2 or lower
+
+Flag examples for chart mismatches:
+- "chart_spec references column 'hour' but data only contains 'period_type', 'total_plays'"
+- "chart_type is 'line' but data has no temporal or sequential column"
+
 
 ## Scoring
 - 5: Genuinely surprising, specific, actionable insight
