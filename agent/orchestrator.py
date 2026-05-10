@@ -125,7 +125,18 @@ def ask(question: str, user_scope: str) -> dict:
                 match = re.search(r'<chart>(.*?)</chart>', final_text, re.DOTALL)
                 if match:
                     chart_spec = parse_json_response(match.group(1))
-
+                    # validate chart spec columns match raw data
+                    if chart_spec and query_result:
+                        import json
+                        raw_data = json.loads(query_result)
+                        if raw_data:
+                            actual_columns = list(raw_data[0].keys())
+                            x_col = chart_spec.get('x')
+                            y_col = chart_spec.get('y')
+                            if x_col not in actual_columns or y_col not in actual_columns:
+                                logger.warning(f"Chart spec mismatch — x:{x_col} y:{y_col} not in {actual_columns}")
+                                #discard invalid chart spec
+                                chart_spec = None  
                 # only judge if it's a data response
                 if response_type == "data":
                     verdict = evaluate_sql(question, produced_query, clean_text, user_scope)
