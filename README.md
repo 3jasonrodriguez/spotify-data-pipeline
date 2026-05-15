@@ -9,7 +9,7 @@
 
 ## Table of Contents
 
-- [Hero](#dj-data)
+- [Overview](#overview)
 - [Architecture](#architecture)
 - [Feature Walkthrough](#feature-walkthrough)
 - [Evolution of the Project](#evolution-of-the-project)
@@ -21,6 +21,8 @@
 
 ---
 
+## Overview
+
 It started as a simple question: what does my Spotify streaming history actually look like as data? The answer turned out to be far more interesting than expected — and far more buildable than I initially believed. What began as a personal ETL pipeline grew into a medallion architecture on AWS, an Apache Airflow orchestration layer, a PostgreSQL gold layer modeled as a star schema, an interactive Streamlit dashboard, and finally a three-tier LLM system that generates SQL, judges its own output, and autonomously surfaces insights neither user thought to look for.
 
 This is my first personal project. I built it deliberately — writing the code myself with Claude as a design partner and code reviewer, not a shortcut. Every architectural decision, every prompt engineering iteration, every debugging session was mine to own. That mattered to me. Building something real, in a domain I love, with tools that pushed me — that's what this project is.
@@ -29,23 +31,48 @@ This is my first personal project. I built it deliberately — writing the code 
 
 ## Architecture
 
-I chose a Medallion architecture to give a clearly segregated look at the data from raw data to transformations and then to the analytical layer — it also makes it easier to track the status of the data throughout the flow. Additionally, the data is destined to be visualized for analysis — something the medallion architecture is a good fit for given the size of the data. The project is hosted in the cloud for practice with cloud engineering and to leverage the compute for the analysis.
+A medallion architecture on AWS — raw data flows from S3 through Glue and Athena into a PostgreSQL star schema, orchestrated by Airflow and served through Streamlit, all running on a single EC2 instance.
 
 ![Pipeline Architecture](docs/diagrams/dj-data-pipeline-diagram.png)
 
 ### Bronze Layer — Raw Ingestion
 
+Spotify history exports, Spotify API metadata, and MusicBrainz genre enrichment land in S3 — cleansed of PII and partitioned by user and year.
+
+<details>
+<summary>Read more</summary>
+
 The bronze layer is the entry point for all raw data. Spotify streaming history arrives as static JSON exports and is lightly cleansed to remove PII before landing in S3. The data is enriched at this stage with additional context from the Spotify API — primarily library and track metadata — and from MusicBrainz, an open music database used to fill the artist and genre relationships that Spotify deprecated from their API.
 
 S3 was chosen as the storage layer for its native integration with Glue and Athena, its flexible partitioning model, and prior familiarity. As the project expanded to a second user, partitions were structured around users from the start — a decision that propagated cleanly through every downstream layer and made cross-user querying straightforward later on.
 
+</details>
+
+---
+
 ### Silver Layer — Schema & Transformation
+
+Glue crawlers infer schemas from S3 JSONL and create Athena-queryable tables — no manual table scripts, S3 treated as source of truth.
+
+<details>
+<summary>Read more</summary>
 
 The silver layer is built on AWS Glue and Athena. Glue crawlers crawl the S3 bronze data, infer schemas from the stored JSONL files, and automatically create tables available for Athena querying — eliminating the need to write and maintain manual table creation scripts. Athena then queries S3 directly through those tables, keeping the architecture lean by treating S3 as the source of truth rather than introducing another database layer.
 
 Crawlers are run manually in this project, a deliberate tradeoff to conserve AWS resources outside of active development and demonstration. One practical challenge at this layer was handling schema drift — changes in the Spotify API's response structure occasionally required crawler reruns and schema adjustments, a real-world data engineering problem that shaped how the bronze layer stored certain datasets as snapshots rather than appended records.
 
+</details>
+
+---
+
 ### Gold Layer — Analytical Model
+
+Python extracts Athena query results and loads them into a PostgreSQL star schema — one fact table, five dimensions, a bridge table, and isolated per-user schemas.
+
+![Star Schema](docs/diagrams/dj-data-star-schema.png)
+
+<details>
+<summary>Read more</summary>
 
 The gold layer lives in PostgreSQL, chosen deliberately for hands-on experience with a widely used open-source database after a background primarily in Oracle. Data arrives here via Python scripts that execute Athena queries against the silver layer and insert the results into Postgres using psycopg2.
 
@@ -53,9 +80,16 @@ The data is modeled as a star schema centered on a single fact table — `fact_p
 
 As the project expanded to a second user, each user was given an isolated Postgres schema containing the same table structure rather than sharing tables with a user column — a cleaner separation that simplified permissioning, querying, and the readonly access model built for the agentic layer later on.
 
-![Star Schema](docs/diagrams/dj-data-star-schema.png)
+</details>
+
+---
 
 ### Orchestration — Apache Airflow
+
+Airflow manages the full ETL flow with explicit task dependencies, a boolean parameter for full vs. lightweight runs, and an on-demand Docker Compose stack separate from the application layer.
+
+<details>
+<summary>Read more</summary>
 
 Apache Airflow orchestrates the full pipeline, managing task dependencies and execution order across the ETL flow. DAG tasks cover loading raw streaming history from flat files, and individual loads for each dimension and fact table. Dependencies are explicitly defined in the DAG based on upstream data requirements — dimensions must be populated before the fact table, mirroring standard dimensional modeling load order.
 
@@ -65,17 +99,37 @@ Airflow was chosen deliberately for exposure to modern orchestration tooling, bu
 
 Airflow runs on-demand via a separate Docker Compose file, deliberately decoupled from the always-running application stack of Postgres and Streamlit. This separation reflects a practical operational distinction — the ETL pipeline isn't always needed, and being able to spin up the application layer independently for dashboard work or database changes without bringing up the full orchestration stack keeps the infrastructure lean and purposeful.
 
+</details>
+
+---
+
 ### Application Layer — Streamlit
+
+Three-page app: custom visualizations dashboard, agentic natural language chat interface, and an autonomous discoveries page — all querying Postgres directly.
+
+<details>
+<summary>Read more</summary>
 
 Streamlit serves as the front-facing application layer, hosting three pages — an interactive visualization dashboard, an agentic natural language chat interface for querying the data, and an autonomous discoveries page that surfaces insights neither user thought to ask for. It was chosen for its clean aesthetic and fast iteration cycle, originally scoped to just the visualization page before naturally becoming the home for the agentic layer as the project expanded.
 
 Streamlit connects directly to the PostgreSQL gold layer, keeping the application layer thin and the database as the single source of truth for both the dashboard and the AI-powered query interface.
 
+</details>
+
+---
+
 ### Infrastructure — AWS EC2
+
+Full stack on a single `c7i-flex.large` instance — Docker Compose, EC2 User Data bootstrapping, local dev → GitHub → EC2 workflow.
+
+<details>
+<summary>Read more</summary>
 
 The project runs entirely on a single EC2 `c7i-flex.large` instance — a deliberate simplicity choice for a personal project that balances cost and compute effectively. Postgres, Streamlit, the MCP server, and Airflow all run on the same instance via Docker Compose, keeping the deployment straightforward without sacrificing the real-world infrastructure experience.
 
 The development workflow follows a clean separation between local and cloud environments — code is written locally, pushed to GitHub, and pulled onto the EC2 instance rather than edited directly on the server. The instance is bootstrapped via EC2 User Data, ensuring the environment is reproducible from a clean start.
+
+</details>
 
 ---
 
@@ -83,31 +137,61 @@ The development workflow follows a clean separation between local and cloud envi
 
 ### Visualizations
 
+A decade of streaming history in one dashboard — KPIs, daily streaming bar chart with drilldown, genre trends, library growth, listening streaks, streams by day of week, top ten tracks, annual hours, and an artist word cloud. Multi-user selector controls the full page.
+
+<details>
+<summary>Read more</summary>
+
 The visualizations page is the original core of DJ Data — a fully custom analytics dashboard built on a decade of personal streaming history. A multi-user selector at the top controls the entire page, allowing seamless switching between users.
 
 The page includes: a KPI summary row, a full streaming history bar chart where clicking any day drills down into what was played and for how long, yearly genre trends with multi-genre overlay filtering, library growth over time, listening streaks showing the longest consecutive days a track was played, streaming hours by day of week, top ten most played tracks, annual streaming hours by year, and an artist word cloud.
 
 Genre gaps are acknowledged directly on the page, a transparency decision reflecting known limitations in the MusicBrainz enrichment data.
 
+</details>
+
+---
+
 ### DJ Data — Chat Interface
+
+Natural language to SQL — ask questions about your listening history in plain English, get answers with charts. Confidence-aware: the eval layer surfaces when it isn't sure.
+
+![Agentic Loop](docs/diagrams/dj-data-agentic-loop.png)
+
+<details>
+<summary>Read more</summary>
 
 The DJ Data page is the agentic analytics layer — a natural language interface for querying a decade of streaming data without writing a single line of SQL. A user scope selector supports querying Jason's data, Kelly's data, or a cross-user comparison.
 
 Six suggested questions offer jumping off points for exploration, alongside an open prompt for freeform questions. DJ Data answers in natural language accompanied by an appropriate chart or table, and is transparent about its confidence — if the evaluation layer flags a low quality answer, the response says so and invites a rephrased question. Questions outside the scope of the database are handled gracefully rather than hallucinated.
 
-![Agentic Loop](docs/diagrams/dj-data-agentic-loop.png)
+</details>
+
+---
 
 ### Discoveries
+
+An Airflow DAG lets Claude autonomously explore the database and surface insights nobody asked for — one per user, one cross-user comparison. Explore Further hands off directly to the chat interface.
+
+![Discoveries Flow](docs/diagrams/dj-data-discoveries.png)
+
+<details>
+<summary>Read more</summary>
 
 The Discoveries page surfaces insights neither user thought to ask for. A separate Airflow DAG allows Claude to autonomously explore the PostgreSQL database and generate notable findings — presented as individual discoveries for each user and a cross-user comparison discovery. It's the most agentic part of the project: unprompted, exploratory, and driven entirely by what the data actually contains.
 
 The page displays the latest passing discovery per user scope, with a full archive of past discoveries below. Clicking any past discovery opens it in a popover. Clicking **Explore Further** on any discovery auto-populates the DJ Data chat page with the correct user scope and follow-up question — handing off seamlessly to the ask flow.
 
-![Discoveries Flow](docs/diagrams/dj-data-discoveries.png)
+</details>
 
 ---
 
 ## Evolution of the Project
+
+DJ Data grew through a series of real pivots — a Spotify API scope limitation that redirected the entire project, a second user added mid-build, a migration from local Docker to EC2, and finally an agentic layer that became the most technically interesting part of the whole thing.
+
+<details>
+<summary>Read more</summary>
 
 DJ Data didn't start as what it is today — it grew through a series of pivots, discoveries, and expanding ambitions.
 
@@ -123,11 +207,18 @@ The final and most significant evolution was the agentic layer — a natural lan
 
 The project closed with a public landing page, a fitting endpoint for something that started as a personal curiosity.
 
+</details>
+
 ---
 
 ## Technical Deep Dives
 
 ### Prompt Engineering
+
+Three distinct prompts — system, judge, and discoveries — each with explicit role definitions, schema context, response format specs, and an assumption-transparency pattern that states reasoning rather than asking clarifying questions.
+
+<details>
+<summary>Read more</summary>
 
 The agentic layer is built on three distinct prompts, each carefully structured to produce consistent, reliable output from the model.
 
@@ -141,7 +232,16 @@ A deliberate design decision across all three prompts was the **assumption-trans
 
 The most surprising aspect of this entire layer was the depth of iteration required to get consistent output. Small changes in phrasing, instruction ordering, and context specificity produced meaningfully different results — a firsthand lesson in how much prompt engineering actually matters in production agentic systems.
 
+</details>
+
+---
+
 ### Eval Layer
+
+LLM-as-a-Judge for both SQL quality and discovery interestingness — structured verdicts, Postgres logging, and a regex safety gate at execution time independent of the eval flow.
+
+<details>
+<summary>Read more</summary>
 
 The evaluation layer is a two-part system designed to assess both the quality of generated SQL and the interestingness of autonomous discoveries before either reaches the user.
 
@@ -153,7 +253,16 @@ Both judges return a structured verdict dictionary. In the orchestration layer, 
 
 A separate safety gate lives at the execution layer rather than the eval layer — regex pattern matching in the `execute_sql` tool blocks destructive SQL at the point of execution, keeping data integrity enforcement independent of quality evaluation.
 
+</details>
+
+---
+
 ### Error Handling
+
+Graceful failure at every layer — try/except around all API calls, distinct user-facing messages for failed verdicts vs. hard errors, Airflow retries, and verdict logging to Postgres.
+
+<details>
+<summary>Read more</summary>
 
 Error handling across DJ Data is designed to fail gracefully at every layer while keeping the user experience clean.
 
@@ -163,27 +272,22 @@ Airflow DAGs include retry logic with a wait gap between attempts, providing res
 
 Logging to Postgres captures judge verdicts — both passing and failing — with scores and explanations, providing an audit trail for the agentic layer. There is room to expand structured logging further across the application layer, something identified as a future improvement.
 
+</details>
+
 ---
 
 ## Limitations and Known Issues
 
-**Error messaging granularity** — Errors in the agentic flow currently surface as "No data for this question" regardless of the underlying cause, whether a token limit, execution failure, or genuinely empty results. More specific error classification is an identified improvement for a future iteration.
-
-**Data freshness** — The dashboard currently has no explicit indicator of how current the data is. A future improvement would surface data freshness metadata directly in the UI, giving users confidence in what they're looking at. A more ambitious extension would allow the agentic layer to trigger the Airflow pipeline DAG when a question implies a need for more recent data.
-
-**Saved tracks and streaming history gap** — The data model separates saved tracks from streaming history, meaning tracks that have been streamed but never saved to the library may have incomplete metadata. This is a known architectural tradeoff that can produce gaps in genre and artist enrichment for certain tracks.
-
-**Genre coverage** — Genre data is sourced from MusicBrainz as a fallback after Spotify deprecated artist and genre fields from their API. MusicBrainz coverage is incomplete for some artists, resulting in known genre gaps that are acknowledged directly in the dashboard.
-
-**Manual Glue crawler runs** — Glue crawlers are run manually rather than on a schedule, a deliberate resource conservation decision that means schema changes require a manual rerun to propagate.
-
-**Landing page and Streamlit navigation** — Navigation between the HTML landing page and the Streamlit application is functional but not seamless, a known limitation of the boundary between a static web page and a Streamlit app.
+- **Error messaging granularity** — Token limit errors and hard failures currently surface the same user-facing message. More specific error classification is a future improvement.
+- **Data freshness** — No explicit freshness indicator on the dashboard. A future extension would surface this in the UI and potentially allow the agentic layer to trigger pipeline runs when recent data is needed.
+- **Saved tracks / streaming history gap** — Tracks streamed but never saved may have incomplete metadata, producing genre and artist enrichment gaps.
+- **Genre coverage** — MusicBrainz coverage is incomplete for some artists, resulting in known genre gaps acknowledged directly in the dashboard.
+- **Manual Glue crawler runs** — Schema changes require a manual crawler rerun; no automated schedule by design.
+- **Landing page / Streamlit navigation** — Navigation between the static landing page and the Streamlit app is functional but not seamless.
 
 ---
 
 ## Replication Guide
-
-DJ Data is replicable with the right accounts and credentials in place. This is a high level overview — the codebase and configuration files contain the implementation detail.
 
 ### Prerequisites
 
@@ -196,24 +300,31 @@ DJ Data is replicable with the right accounts and credentials in place. This is 
 ### Steps
 
 1. Clone the repository locally and on your EC2 instance
-2. Configure Spotify Developer credentials for each user — one set per user in the pipeline
+2. Configure Spotify Developer credentials for each user
 3. Add your Anthropic API key to the environment configuration
-4. Set up your AWS credentials and configure your S3 bucket and EC2 instance
+4. Set up AWS credentials and configure your S3 bucket and EC2 instance
 5. Configure environment variables and `config.yaml` per the provided templates
-6. Spin up the application stack with `make up` and the Airflow stack with `make airflow-up` when pipeline runs are needed
-7. Run the Glue crawlers to build the silver layer tables after initial S3 loads
+6. Spin up the application stack with `make up` and Airflow with `make airflow-up` when needed
+7. Run Glue crawlers to build the silver layer tables after initial S3 loads
 8. Trigger the Airflow DAG for an initial full pipeline run to populate the gold layer
-9. Access the Streamlit dashboard via SSH tunneling — the app is not publicly hosted. Forward the remote port to localhost:
+9. Access Streamlit via SSH tunnel:
 
 ```bash
 ssh -L 8501:localhost:8501 ec2-user@<your-ec2-ip>
 ```
 
-> **Note** — The project was built and run on a single EC2 `c7i-flex.large` instance. Resource requirements for other instance types have not been tested.
+> **Note** — Built and tested on a single EC2 `c7i-flex.large` instance. Resource requirements for other instance types have not been tested.
 
 ---
 
 ## Learnings and Reflections
+
+Building DJ Data meant touching nearly every phase of a modern data pipeline. The LLM layer was the most unexpected — the specificity required in prompts and how small instruction changes produced meaningfully different output was a genuine revelation. Scope creep and perfectionism were real challenges, and learning when to ship was its own skill.
+
+The ending state of the project is impressive considering where it started. That matters.
+
+<details>
+<summary>Read more</summary>
 
 Building DJ Data meant touching nearly every phase of a modern data pipeline — ingestion, transformation, modeling, orchestration, cloud infrastructure, application development, and finally an agentic AI layer. That end-to-end ownership was the point, and it delivered.
 
@@ -227,9 +338,16 @@ If anything would be done differently, it would be more user testing beyond pers
 
 The ending state of the project is impressive considering where it started. That matters.
 
+</details>
+
 ---
 
 ## How Claude Was Used
+
+Claude was a design partner, code reviewer, scope manager, and documentation collaborator throughout the build — not a code generator. The agentic layer running in production is a separate relationship entirely: Claude as a runtime engine powering SQL generation, evaluation, and autonomous discovery.
+
+<details>
+<summary>Read more</summary>
 
 Claude was a core collaborator throughout the build — but not a shortcut. The relationship was deliberately structured to preserve code ownership and genuine understanding at every step.
 
@@ -238,6 +356,8 @@ During the build, Claude served as a design partner for architectural decisions,
 A deliberate ground rule throughout: Claude was instructed to guide and review rather than implement. Understanding checks were a regular part of the process, ensuring that every piece of code written was owned and explainable, not just functional. The ratio of human to AI written code skews heavily toward the author — and more importantly, the understanding behind it is entirely theirs.
 
 In the running application, Claude plays a different role entirely — it is the runtime engine. The Anthropic API powers the natural language to SQL generation, the judge evaluation layer, and the autonomous discoveries DAG. Claude as a build tool and Claude as a production component are two distinct relationships, and DJ Data is a firsthand demonstration of both.
+
+</details>
 
 ---
 
