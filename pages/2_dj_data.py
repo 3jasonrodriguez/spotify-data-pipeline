@@ -11,6 +11,8 @@ from etl.utils.logger import get_logger
 from agent.orchestrator import ask
 logger = get_logger(__name__)
 import time
+
+
 PROMOTED_QUESTIONS_SINGLE = [
     "Who are my top 10 most played artists?",
     "Which artists have I recently discovered in the last year?",
@@ -29,9 +31,10 @@ PROMOTED_QUESTIONS_COMPARE = [
 ]
 
 def app():
-    #Render the Visualizations
-    st.set_page_config(layout="wide")
-    st.title("My Spotify Analytics")
+    st.set_page_config(
+        layout="wide"
+    )
+    st.title("🤖 DJ Data")
     #query_history is a list that grows as the user asks questions. 
     #current_question lets a promoted button pre-fill the chat input.
     if "query_history" not in st.session_state:

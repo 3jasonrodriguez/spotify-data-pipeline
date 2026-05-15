@@ -10,6 +10,7 @@ from agent.orchestrator import ask
 logger = get_logger(__name__)
 import time
 
+
 def get_discoveries(conn):
     query = streamlit_queries.GET_DISCOVERIES
     df = pd.read_sql(query, conn)
@@ -29,9 +30,10 @@ def show_discovery(row):
         st.switch_page("pages/2_dj_data.py")
 
 def app():
-    #Render the Visualizations
-    st.set_page_config(layout="wide")
-    st.title("Discoveries")
+    st.set_page_config(
+        layout="wide"
+    )
+    st.title("✨ Discoveries")
     #query_history is a list that grows as the user asks questions. 
     #current_question lets a promoted button pre-fill the chat input.
     if "query_history" not in st.session_state:
