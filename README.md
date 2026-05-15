@@ -23,9 +23,9 @@
 
 ## Overview
 
-It started as a simple question: what does my Spotify streaming history actually look like as data? The answer turned out to be far more interesting than expected — and far more buildable than I initially believed. What began as a personal ETL pipeline grew into a medallion architecture on AWS, an Apache Airflow orchestration layer, a PostgreSQL gold layer modeled as a star schema, an interactive Streamlit dashboard, and finally a three-tier LLM system that generates SQL, judges its own output, and autonomously surfaces insights neither user thought to look for.
+What started as a personal ETL pipeline ended as a custom-built analytics dashboard with a three-tier LLM system that generates SQL, judges its own output, and autonomously surfaces insights neither user thought to look for.
 
-This is my first personal project. I built it deliberately — writing the code myself with Claude as a design partner and code reviewer, not a shortcut. Every architectural decision, every prompt engineering iteration, every debugging session was mine to own. That mattered to me. Building something real, in a domain I love, with tools that pushed me — that's what this project is.
+This is my first personal project. I built it deliberately — writing the code myself, owning every architectural decision, every prompt engineering iteration, every debugging session. Building something real, in a domain I love, with tools that pushed me — that's what this project is.
 
 ---
 
@@ -40,11 +40,11 @@ A medallion architecture on AWS — raw data flows from S3 through Glue and Athe
 Spotify history exports, Spotify API metadata, and MusicBrainz genre enrichment land in S3 — cleansed of PII and partitioned by user and year.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The bronze layer is the entry point for all raw data. Spotify streaming history arrives as static JSON exports and is lightly cleansed to remove PII before landing in S3. The data is enriched at this stage with additional context from the Spotify API — primarily library and track metadata — and from MusicBrainz, an open music database used to fill the artist and genre relationships that Spotify deprecated from their API.
+The bronze layer is the entry point for all raw data. Spotify streaming history arrives as static JSON exports and is lightly cleansed to remove PII before landing in S3. The data is enriched with additional context from the Spotify API — primarily library and track metadata — and from MusicBrainz, an open music database used to fill the artist and genre relationships that Spotify deprecated from their API.
 
-S3 was chosen as the storage layer for its native integration with Glue and Athena, its flexible partitioning model, and prior familiarity. As the project expanded to a second user, partitions were structured around users from the start — a decision that propagated cleanly through every downstream layer and made cross-user querying straightforward later on.
+S3 was chosen for its native integration with Glue and Athena, its flexible partitioning model, and prior familiarity. As the project expanded to a second user, partitions were structured around users from the start — a decision that propagated cleanly through every downstream layer and made cross-user querying straightforward later on.
 
 </details>
 
@@ -55,11 +55,11 @@ S3 was chosen as the storage layer for its native integration with Glue and Athe
 Glue crawlers infer schemas from S3 JSONL and create Athena-queryable tables — no manual table scripts, S3 treated as source of truth.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The silver layer is built on AWS Glue and Athena. Glue crawlers crawl the S3 bronze data, infer schemas from the stored JSONL files, and automatically create tables available for Athena querying — eliminating the need to write and maintain manual table creation scripts. Athena then queries S3 directly through those tables, keeping the architecture lean by treating S3 as the source of truth rather than introducing another database layer.
+Glue crawlers crawl the S3 bronze data, infer schemas from stored JSONL files, and automatically create tables available for Athena querying — eliminating manual table creation scripts. Athena queries S3 directly through those tables, keeping the architecture lean.
 
-Crawlers are run manually in this project, a deliberate tradeoff to conserve AWS resources outside of active development and demonstration. One practical challenge at this layer was handling schema drift — changes in the Spotify API's response structure occasionally required crawler reruns and schema adjustments, a real-world data engineering problem that shaped how the bronze layer stored certain datasets as snapshots rather than appended records.
+Crawlers are run manually — a deliberate tradeoff to conserve AWS resources outside of active development. One practical challenge was **schema drift** — changes in the Spotify API's response structure occasionally required crawler reruns and schema adjustments, shaping how the bronze layer stored certain datasets as snapshots rather than appended records.
 
 </details>
 
@@ -72,13 +72,17 @@ Python extracts Athena query results and loads them into a PostgreSQL star schem
 ![Star Schema](docs/diagrams/dj-data-star-schema.png)
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The gold layer lives in PostgreSQL, chosen deliberately for hands-on experience with a widely used open-source database after a background primarily in Oracle. Data arrives here via Python scripts that execute Athena queries against the silver layer and insert the results into Postgres using psycopg2.
+PostgreSQL was chosen deliberately for hands-on experience after a background primarily in Oracle. Data arrives via Python scripts that execute Athena queries and insert results into Postgres using psycopg2.
 
-The data is modeled as a star schema centered on a single fact table — `fact_play_event` — representing one discrete Spotify play event. Surrounding dimension tables cover `dim_track`, `dim_artist`, `dim_date`, `dim_genre`, and `dim_library`, the latter capturing whether a track is saved to a user's library and when. Artist-to-genre relationships are handled through a bridge table, reflecting the many-to-many nature of that relationship.
+**Schema design:**
+- `fact_play_event` — one row per discrete Spotify play event
+- `dim_track`, `dim_artist`, `dim_date`, `dim_genre`, `dim_library` — surrounding dimensions
+- `bridge_artist_genre` — handles the many-to-many artist ↔ genre relationship
+- `dim_library` — captures whether a track is saved and when
 
-As the project expanded to a second user, each user was given an isolated Postgres schema containing the same table structure rather than sharing tables with a user column — a cleaner separation that simplified permissioning, querying, and the readonly access model built for the agentic layer later on.
+**Multi-user design:** each user gets an isolated Postgres schema with the same table structure rather than a shared schema with a user column — cleaner permissioning, simpler querying, and a natural fit for the readonly access model built for the agentic layer.
 
 </details>
 
@@ -86,18 +90,26 @@ As the project expanded to a second user, each user was given an isolated Postgr
 
 ### Orchestration — Apache Airflow
 
-Airflow manages the full ETL flow with explicit task dependencies, a boolean parameter for full vs. lightweight runs, and an on-demand Docker Compose stack separate from the application layer.
+Full pipeline orchestration with explicit task dependencies, a boolean parameter for full vs. lightweight runs, and two separate Docker Compose stacks — pipeline on-demand, application always-running.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-Apache Airflow orchestrates the full pipeline, managing task dependencies and execution order across the ETL flow. DAG tasks cover loading raw streaming history from flat files, and individual loads for each dimension and fact table. Dependencies are explicitly defined in the DAG based on upstream data requirements — dimensions must be populated before the fact table, mirroring standard dimensional modeling load order.
+**DAG structure:**
+- Tasks for loading raw streaming history from flat files
+- Individual tasks per dimension and fact table
+- Explicit dependencies mirror dimensional load order — dims before facts
 
-A boolean parameter controls whether the streaming history flat files are reloaded on a given run, allowing a full end-to-end ETL execution when needed or a lighter run that skips the raw file ingestion — a practical design decision for a pipeline where the source files don't change on every run.
+**Key parameters:**
 
-Airflow was chosen deliberately for exposure to modern orchestration tooling, building on prior experience with job dependency management in Control-M. The LocalExecutor was selected over alternatives like Celery after finding that heavier executors consumed more resources than the project infrastructure warranted.
+| Parameter | Default | Purpose |
+|---|---|---|
+| `ingest_streaming_history` | `False` | Toggles full flat file reload vs. lighter run |
+| `user` | `jason` | Scopes all tasks and S3 paths to a specific user |
 
-Airflow runs on-demand via a separate Docker Compose file, deliberately decoupled from the always-running application stack of Postgres and Streamlit. This separation reflects a practical operational distinction — the ETL pipeline isn't always needed, and being able to spin up the application layer independently for dashboard work or database changes without bringing up the full orchestration stack keeps the infrastructure lean and purposeful.
+**Why LocalExecutor?** Celery required Redis and a separate worker container with no real parallelism benefit. LocalExecutor freed meaningful resources and simplified the compose setup.
+
+**Two Docker Compose stacks:** the application stack (Postgres + Streamlit) runs always-on. Airflow spins up on-demand only when pipeline runs are needed — keeping infrastructure lean and the two concerns cleanly separated.
 
 </details>
 
@@ -108,9 +120,9 @@ Airflow runs on-demand via a separate Docker Compose file, deliberately decouple
 Three-page app: custom visualizations dashboard, agentic natural language chat interface, and an autonomous discoveries page — all querying Postgres directly.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-Streamlit serves as the front-facing application layer, hosting three pages — an interactive visualization dashboard, an agentic natural language chat interface for querying the data, and an autonomous discoveries page that surfaces insights neither user thought to ask for. It was chosen for its clean aesthetic and fast iteration cycle, originally scoped to just the visualization page before naturally becoming the home for the agentic layer as the project expanded.
+Streamlit was chosen for its clean aesthetic and fast iteration cycle, originally scoped to just the visualization page before naturally becoming the home for the agentic layer as the project expanded.
 
 Streamlit connects directly to the PostgreSQL gold layer, keeping the application layer thin and the database as the single source of truth for both the dashboard and the AI-powered query interface.
 
@@ -120,14 +132,16 @@ Streamlit connects directly to the PostgreSQL gold layer, keeping the applicatio
 
 ### Infrastructure — AWS EC2
 
-Full stack on a single `c7i-flex.large` instance — Docker Compose, EC2 User Data bootstrapping, local dev → GitHub → EC2 workflow.
+Full stack on a single `c7i-flex.large` — Docker Compose, EC2 User Data bootstrapping, local → GitHub → EC2 development workflow.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The project runs entirely on a single EC2 `c7i-flex.large` instance — a deliberate simplicity choice for a personal project that balances cost and compute effectively. Postgres, Streamlit, the MCP server, and Airflow all run on the same instance via Docker Compose, keeping the deployment straightforward without sacrificing the real-world infrastructure experience.
+Everything runs on one instance — Postgres, Streamlit, the MCP server, and Airflow — a deliberate simplicity choice that still delivers real infrastructure experience.
 
-The development workflow follows a clean separation between local and cloud environments — code is written locally, pushed to GitHub, and pulled onto the EC2 instance rather than edited directly on the server. The instance is bootstrapped via EC2 User Data, ensuring the environment is reproducible from a clean start.
+- **Dev workflow:** code written locally → pushed to GitHub → pulled on EC2. Never edited directly on the server.
+- **EC2 User Data:** bootstraps the environment on a fresh instance, making the setup reproducible without manual configuration.
+- **Instance:** `c7i-flex.large` balances cost and compute for a personal project workload.
 
 </details>
 
@@ -137,16 +151,25 @@ The development workflow follows a clean separation between local and cloud envi
 
 ### Visualizations
 
-A decade of streaming history in one dashboard — KPIs, daily streaming bar chart with drilldown, genre trends, library growth, listening streaks, streams by day of week, top ten tracks, annual hours, and an artist word cloud. Multi-user selector controls the full page.
+A decade of streaming history in one dashboard — KPIs, daily bar chart with drilldown, genre trends, library growth, listening streaks, streams by day of week, top ten tracks, annual hours, and an artist word cloud. Multi-user selector controls the full page.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The visualizations page is the original core of DJ Data — a fully custom analytics dashboard built on a decade of personal streaming history. A multi-user selector at the top controls the entire page, allowing seamless switching between users.
+The visualizations page is the original core of DJ Data — a fully custom analytics dashboard built on a decade of personal streaming history.
 
-The page includes: a KPI summary row, a full streaming history bar chart where clicking any day drills down into what was played and for how long, yearly genre trends with multi-genre overlay filtering, library growth over time, listening streaks showing the longest consecutive days a track was played, streaming hours by day of week, top ten most played tracks, annual streaming hours by year, and an artist word cloud.
+**Included visualizations:**
+- **KPI row** — top-level listening stats at a glance
+- **Daily streaming bar chart** — click any bar to drill down into what was played that day and for how long
+- **Yearly genre trends** — multi-genre overlay with filter for genre selection
+- **Library growth** — tracks added to the library over time
+- **Listening streaks** — longest consecutive days a track was streamed
+- **Streams by day of week** — listening hours against each day
+- **Top 10 most played tracks**
+- **Annual streaming hours**
+- **Artist word cloud**
 
-Genre gaps are acknowledged directly on the page, a transparency decision reflecting known limitations in the MusicBrainz enrichment data.
+Genre gaps from MusicBrainz are acknowledged directly on the page — a transparency decision rather than a silent omission.
 
 </details>
 
@@ -159,11 +182,16 @@ Natural language to SQL — ask questions about your listening history in plain 
 ![Agentic Loop](docs/diagrams/dj-data-agentic-loop.png)
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The DJ Data page is the agentic analytics layer — a natural language interface for querying a decade of streaming data without writing a single line of SQL. A user scope selector supports querying Jason's data, Kelly's data, or a cross-user comparison.
+The DJ Data page is the agentic analytics layer — a natural language interface for querying a decade of streaming data without writing SQL.
 
-Six suggested questions offer jumping off points for exploration, alongside an open prompt for freeform questions. DJ Data answers in natural language accompanied by an appropriate chart or table, and is transparent about its confidence — if the evaluation layer flags a low quality answer, the response says so and invites a rephrased question. Questions outside the scope of the database are handled gracefully rather than hallucinated.
+- **User scope selector** — Jason · Kelly · Compare Both
+- **Six suggested questions** — curated jumping-off points for exploration
+- **Open prompt** — freeform question input
+- **Assumption transparency** — the model states its assumptions explicitly rather than asking clarifying questions
+- **Confidence-aware output** — failed eval verdicts surface gracefully with an invitation to rephrase
+- **Out-of-scope handling** — questions outside the database are declined, not hallucinated
 
 </details>
 
@@ -176,11 +204,14 @@ An Airflow DAG lets Claude autonomously explore the database and surface insight
 ![Discoveries Flow](docs/diagrams/dj-data-discoveries.png)
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The Discoveries page surfaces insights neither user thought to ask for. A separate Airflow DAG allows Claude to autonomously explore the PostgreSQL database and generate notable findings — presented as individual discoveries for each user and a cross-user comparison discovery. It's the most agentic part of the project: unprompted, exploratory, and driven entirely by what the data actually contains.
+The Discoveries page is the most agentic part of the project — unprompted, exploratory, driven entirely by what the data contains.
 
-The page displays the latest passing discovery per user scope, with a full archive of past discoveries below. Clicking any past discovery opens it in a popover. Clicking **Explore Further** on any discovery auto-populates the DJ Data chat page with the correct user scope and follow-up question — handing off seamlessly to the ask flow.
+- **Latest discovery** shown per user scope (Jason · Kelly · Compare Both)
+- **Past discoveries archive** — full history below the latest, click any to open in a popover
+- **Explore Further** — auto-populates the DJ Data chat page with the correct scope and follow-up question, handing off seamlessly to the ask flow
+- **Judge-filtered** — only discoveries that pass the evaluation layer reach the page
 
 </details>
 
@@ -188,24 +219,30 @@ The page displays the latest passing discovery per user scope, with a full archi
 
 ## Evolution of the Project
 
-DJ Data grew through a series of real pivots — a Spotify API scope limitation that redirected the entire project, a second user added mid-build, a migration from local Docker to EC2, and finally an agentic layer that became the most technically interesting part of the whole thing.
+From a simple ETL idea to a full agentic analytics platform — shaped by real constraints, API changes, and expanding ambition at every step.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-DJ Data didn't start as what it is today — it grew through a series of pivots, discoveries, and expanding ambitions.
+| Phase | What Changed | Why |
+|---|---|---|
+| Initial scope | Global playlist analysis → personal library only | Spotify API scope limitations |
+| Enrichment | Added MusicBrainz genre data | Spotify deprecated artist/genre fields |
+| Partitioning | Refined S3 partition strategy per dataset | Saved tracks → truncate/reload · streaming history → year partitions |
+| Multi-user | Extended pipeline, schema, and queries to a second user | Real mid-project requirement change touching every layer |
+| Infrastructure | Local Docker → AWS EC2 | WSL memory limits under Airflow + Postgres |
+| Agentic layer | Added natural language interface, eval layer, discoveries DAG | Wanted to explore LLM integration with real data |
+| Landing page | Added public HTML landing page | Portfolio presentation and project closure |
 
-It began with two parallel ideas: analyzing personal Spotify streaming history, and exploring global stream data from genre-based playlists. The project began with six concrete questions to answer from personal listening data: top 10 most played tracks of all time, listening history over time by genre, top 10 tracks played during work hours, total listening time per year, saved library tracks never played, and longest consecutive listening streak by track.
+**The six original questions** that started it all:
+1. Top 10 most time-listened tracks of all time
+2. Listening history over time by genre
+3. Top 10 tracks played during work hours
+4. Total listening time per year
+5. Saved library tracks never played
+6. Longest consecutive listening streak by track
 
-The playlist idea hit an early wall — Spotify's API scope limitations meant the project would be confined to personal library data only. That constraint turned out to be a gift. A decade of personal streaming history is richer and more interesting than aggregated playlist data, and the questions it raised were more meaningful. As the data got cleaner and the schema took shape, new questions emerged from what the data actually showed and the dashboard evolved to reflect that. Those six were the spark — not the final scope.
-
-From there the project grew incrementally. MusicBrainz enrichment was added to fill the genre gap left by Spotify's deprecation of artist and genre fields. Partition schemes were refined along the way — saved tracks moved to a truncate and reload pattern where partitions added no value, while streaming history retained year-based partitions to support the cross-year analytical questions the project was built to answer.
-
-The pipeline was then extended to a second user, requiring a rethink of the schema structure, S3 partitioning, and query scope — a real mid-project requirement change that touched every layer. Shortly after, the local development environment moved to Docker on EC2, bringing the project into the cloud and off a personal laptop.
-
-The final and most significant evolution was the agentic layer — a natural language analytics interface built on top of the existing pipeline. What started as prompt engineering quickly revealed unexpected depth: the level of context, instruction, and iteration required to produce reliable SQL generation and coherent insights was a genuine surprise. More surprising still was the quality of what the model found when given autonomous access to the data — the discoveries it surfaced were insights neither user had thought to look for.
-
-The project closed with a public landing page, a fitting endpoint for something that started as a personal curiosity.
+*Those six were the spark — not the final scope.*
 
 </details>
 
@@ -215,22 +252,29 @@ The project closed with a public landing page, a fitting endpoint for something 
 
 ### Prompt Engineering
 
-Three distinct prompts — system, judge, and discoveries — each with explicit role definitions, schema context, response format specs, and an assumption-transparency pattern that states reasoning rather than asking clarifying questions.
+Three distinct prompts — system, judge, and discoveries — each structured with explicit roles, schema context, and an assumption-transparency pattern that states reasoning rather than asking clarifying questions.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The agentic layer is built on three distinct prompts, each carefully structured to produce consistent, reliable output from the model.
+#### System Prompt
+Accepts `user_scope` as a parameter. Opens with behavioral instructions scoped to that user, defines the agent's role, and specifies the full response format — natural language insight, SQL query, and chart specification with explicit guidelines for each.
 
-The **system prompt** accepts a user scope parameter — Jason, Kelly, or Compare Both — and opens with a behavioral instruction tailored to that scope, telling the model what data it has access to and how to apply it. It then defines the agent's role, specifies the expected response format in detail, and provides explicit guidelines for each component of the response object including the natural language insight, the SQL query, and the chart specification.
+#### Judge SQL Prompt
+Defines an evaluator role explicitly told it is judging output from another LLM call. Receives the original question, generated SQL, and natural language response. Scores on a **1–5 rubric** — pass threshold ≥ 3 — across:
+- Well-formed SQL
+- Query performance
+- Applicability to the question
+- Analytical correctness
 
-The **judge prompt** defines an evaluator role and is given the full database schema as context. It receives the original question, the generated SQL, and the model's response as inputs, scores the answer against a defined rubric, and returns a structured evaluation. The scoring mechanism determines whether DJ Data surfaces the answer confidently or flags it for rephrasing.
+#### Discoveries Prompt
+Accepts `user_scope` and full schema context. Passes in prior discoveries to prevent repetition. Defines an autonomous exploration role with detailed instructions for response format, chart spec, and query structure.
 
-The **discoveries prompt** also accepts user scope and schema context, defines an autonomous exploration role, passes in prior discoveries to prevent repetition, and provides detailed instructions for response format including chart spec guidelines and query structure.
+---
 
-A deliberate design decision across all three prompts was the **assumption-transparency pattern** — rather than asking clarifying questions upfront, the model is instructed to make reasonable assumptions on ambiguous terms like "recent" or "trending" and state them explicitly in the response. This was a conscious UX and architecture choice: it keeps the interface clean, tests the model's reasoning capability directly, and produces a more impressive and honest user experience than a back-and-forth clarification flow.
+**Assumption-transparency pattern** — rather than asking clarifying questions upfront, the model states its assumptions explicitly (e.g. *"I'm interpreting 'recent' as the last 90 days"*). This keeps the UI clean, tests the model's reasoning directly, and produces a more honest user experience than a clarification loop.
 
-The most surprising aspect of this entire layer was the depth of iteration required to get consistent output. Small changes in phrasing, instruction ordering, and context specificity produced meaningfully different results — a firsthand lesson in how much prompt engineering actually matters in production agentic systems.
+> The most surprising part: small changes in phrasing, instruction ordering, and context specificity produced meaningfully different output. Prompt engineering at this level is a real discipline.
 
 </details>
 
@@ -241,17 +285,26 @@ The most surprising aspect of this entire layer was the depth of iteration requi
 LLM-as-a-Judge for both SQL quality and discovery interestingness — structured verdicts, Postgres logging, and a regex safety gate at execution time independent of the eval flow.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-The evaluation layer is a two-part system designed to assess both the quality of generated SQL and the interestingness of autonomous discoveries before either reaches the user.
+#### Judge SQL
+- **Input:** question · user scope · generated SQL · natural language response
+- **Evaluates:** well-formed · performant · applicable · analytically correct
+- **Scoring:** 1–5 · pass ≥ 3
+- **Output:** structured verdict dict → logged to `llm_eval_log`
 
-**Judge SQL** receives the original question, user scope, generated SQL, and the natural language response as inputs. It is explicitly told it is evaluating output produced by another LLM call. It assesses whether the SQL is well-formed, performant, applicable to the question, and analytically correct — scoring on a 1-5 rubric where a 3 or higher is required to pass.
+#### Judge Discovery
+- **Input:** insight text · follow-up question · chart spec · user scope
+- **Evaluates:** interesting · grounded in data · appropriate chart
+- **Scoring:** 1–5 · pass ≥ 2 *(intentionally permissive — threshold designed to increase over time)*
+- **Output:** structured verdict dict → logged to `discovery_eval_log`
 
-**Judge Discovery** evaluates autonomous insights against a different rubric — whether the discovery is genuinely interesting, grounded in the data, and paired with an appropriate chart suggestion. Its passing threshold is intentionally set at 2 or higher, a deliberate calibration to maximize the volume of insights returned initially. That threshold is designed to be raised over time as the discovery quality is observed in practice.
+#### Safety Gate
+A **regex check in `execute_sql`** blocks destructive SQL at execution time — independent of the eval layer. Data integrity enforcement and quality evaluation are deliberately separated concerns.
 
-Both judges return a structured verdict dictionary. In the orchestration layer, the `ask` and `discover` functions check the verdict before passing results to Streamlit — passed verdicts are rendered, failed verdicts are handled gracefully in the UI with an appropriate message to the user. All verdicts, passing and failing, are logged to PostgreSQL with their scores and explanations, creating an audit trail for evaluating and improving the system over time.
-
-A separate safety gate lives at the execution layer rather than the eval layer — regex pattern matching in the `execute_sql` tool blocks destructive SQL at the point of execution, keeping data integrity enforcement independent of quality evaluation.
+#### Verdict flow
+- ✅ **Pass** → result rendered in Streamlit
+- ❌ **Fail** → graceful user-facing message · verdict still logged with score and reasoning
 
 </details>
 
@@ -259,18 +312,21 @@ A separate safety gate lives at the execution layer rather than the eval layer �
 
 ### Error Handling
 
-Graceful failure at every layer — try/except around all API calls, distinct user-facing messages for failed verdicts vs. hard errors, Airflow retries, and verdict logging to Postgres.
+Graceful failure at every layer — distinct user-facing messages for failed verdicts vs. hard errors, Airflow retries, and verdict logging to Postgres.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-Error handling across DJ Data is designed to fail gracefully at every layer while keeping the user experience clean.
+| Failure type | User sees | Behind the scenes |
+|---|---|---|
+| Hard error (token limit, execution failure) | "No data for this question" | Logged via `get_logger` |
+| Failed judge verdict | "DJ Data is not confident in this answer" | Verdict logged to Postgres with score + reasoning |
+| Out-of-scope question | Graceful decline | Handled by response_type parsing |
 
-All Anthropic API calls are wrapped in try/except blocks. Failures in the agentic flow — whether from token limits, malformed responses, or execution errors — are logged behind the scenes and surface to the user as "No data for this question" rather than exposing raw errors. Failed judge verdicts follow a separate pattern, surfacing as "DJ Data is not confident in this answer, try rephrasing your question" — keeping the UI predictable regardless of the failure reason.
-
-Airflow DAGs include retry logic with a wait gap between attempts, providing resilience against transient failures in API calls or database connections during pipeline runs. Both the pipeline DAG and the discoveries DAG have thorough logging throughout, giving clear visibility into task execution and failure points within the Airflow UI.
-
-Logging to Postgres captures judge verdicts — both passing and failing — with scores and explanations, providing an audit trail for the agentic layer. There is room to expand structured logging further across the application layer, something identified as a future improvement.
+- All Anthropic API calls wrapped in **try/except**
+- Airflow DAG tasks have **retry logic with wait gaps** for transient failures
+- Both pipeline and discoveries DAGs have **thorough task-level logging** visible in the Airflow UI
+- *Known gap:* token limit errors and genuinely empty results currently return the same user message — more granular classification is a future improvement
 
 </details>
 
@@ -278,19 +334,18 @@ Logging to Postgres captures judge verdicts — both passing and failing — wit
 
 ## Limitations and Known Issues
 
-- **Error messaging granularity** — Token limit errors and hard failures currently surface the same user-facing message. More specific error classification is a future improvement.
-- **Data freshness** — No explicit freshness indicator on the dashboard. A future extension would surface this in the UI and potentially allow the agentic layer to trigger pipeline runs when recent data is needed.
-- **Saved tracks / streaming history gap** — Tracks streamed but never saved may have incomplete metadata, producing genre and artist enrichment gaps.
-- **Genre coverage** — MusicBrainz coverage is incomplete for some artists, resulting in known genre gaps acknowledged directly in the dashboard.
-- **Manual Glue crawler runs** — Schema changes require a manual crawler rerun; no automated schedule by design.
-- **Landing page / Streamlit navigation** — Navigation between the static landing page and the Streamlit app is functional but not seamless.
+- **Error messaging granularity** — Token limit errors and hard failures surface the same message. More specific classification is a future improvement.
+- **Data freshness** — No explicit freshness indicator on the dashboard. Future: surface in UI, potentially allow agentic layer to trigger pipeline runs.
+- **Saved tracks / streaming history gap** — Tracks streamed but never saved may have incomplete metadata and genre gaps.
+- **Genre coverage** — MusicBrainz coverage is incomplete for some artists. Gaps are acknowledged on the dashboard.
+- **Manual Glue crawler runs** — Schema changes require a manual rerun by design.
+- **Landing page / Streamlit navigation** — Functional but not seamless across the static/Streamlit boundary.
 
 ---
 
 ## Replication Guide
 
 ### Prerequisites
-
 - AWS account with EC2 and S3 access
 - Spotify Developer credentials per user
 - Anthropic API credentials
@@ -313,30 +368,36 @@ Logging to Postgres captures judge verdicts — both passing and failing — wit
 ssh -L 8501:localhost:8501 ec2-user@<your-ec2-ip>
 ```
 
-> **Note** — Built and tested on a single EC2 `c7i-flex.large` instance. Resource requirements for other instance types have not been tested.
+> **Note** — Built and tested on a single EC2 `c7i-flex.large`. Resource requirements for other instance types have not been tested.
 
 ---
 
 ## Learnings and Reflections
 
-Building DJ Data meant touching nearly every phase of a modern data pipeline. The LLM layer was the most unexpected — the specificity required in prompts and how small instruction changes produced meaningfully different output was a genuine revelation. Scope creep and perfectionism were real challenges, and learning when to ship was its own skill.
+End-to-end ownership of a real project is the best teacher. The LLM layer was the biggest surprise — prompt engineering at production depth is a genuine discipline. Scope creep was real, and learning when to ship was its own skill.
 
-The ending state of the project is impressive considering where it started. That matters.
+*The ending state of the project is impressive considering where it started. That matters.*
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-Building DJ Data meant touching nearly every phase of a modern data pipeline — ingestion, transformation, modeling, orchestration, cloud infrastructure, application development, and finally an agentic AI layer. That end-to-end ownership was the point, and it delivered.
+**What landed:**
+- Touching every phase of a modern data pipeline — ingestion, transformation, modeling, orchestration, infrastructure, application, and agentic AI — in one project
+- Deliberate curiosity about *why* at each design decision, not just *what*
+- Firsthand understanding that working with LLMs as engineering components is a different discipline than using them as chat tools
 
-Throughout the project there was a deliberate curiosity about design at each stage — not just making things work, but asking why a particular pattern or tool was the right choice. That instinct, reinforced by constantly researching best practices, produced better architectural decisions and a deeper understanding of the tradeoffs involved.
+**What surprised me:**
+- How much prompt specificity and instruction ordering affected LLM output quality
+- The quality of insights the model surfaced autonomously — discoveries neither user thought to ask for
+- How real constraints (Spotify API changes, memory limits, scope creep) shaped better decisions than unlimited resources might have
 
-The LLM layer was the most unexpected learning. The specificity required in prompts and context — and how meaningfully small changes in instruction affected output quality — was a genuine revelation. Working with language models as engineering components rather than chat interfaces is a different discipline, and building it firsthand made that clear in a way that reading about it never could.
+**What I'd do differently:**
+- More user testing beyond personal use — the project was always functional but outside perspectives would have sharpened it earlier
 
-The project also surfaced some honest personal lessons. Perfectionism and scope creep crept in toward the end, and learning when to stop and ship something demonstrable was its own skill. Resource constraints — both compute and time — shaped better decisions than unlimited resources might have. And building in a domain that was personally meaningful made the hard parts worth pushing through.
-
-If anything would be done differently, it would be more user testing beyond personal use. But the priority was always to ship something working, learnable, and real — and that's what DJ Data is.
-
-The ending state of the project is impressive considering where it started. That matters.
+**Personal lessons:**
+- Perfectionism and scope creep are real forces — naming them helped manage them
+- Building in a domain you care about makes the hard parts worth pushing through
+- Learning by doing is the only way that actually sticks
 
 </details>
 
@@ -344,18 +405,28 @@ The ending state of the project is impressive considering where it started. That
 
 ## How Claude Was Used
 
-Claude was a design partner, code reviewer, scope manager, and documentation collaborator throughout the build — not a code generator. The agentic layer running in production is a separate relationship entirely: Claude as a runtime engine powering SQL generation, evaluation, and autonomous discovery.
+Claude played multiple roles throughout the build — design partner, code reviewer, scope manager, and documentation collaborator. In the running application, Claude is the runtime engine powering SQL generation, evaluation, and autonomous discovery.
+
+**Estimated code ownership: ~75–80% written independently.** Claude guided and reviewed — it didn't implement.
 
 <details>
-<summary>Read more</summary>
+<summary>Dive deeper</summary>
 
-Claude was a core collaborator throughout the build — but not a shortcut. The relationship was deliberately structured to preserve code ownership and genuine understanding at every step.
+**During the build, Claude served as:**
+- 🏗️ **Design partner** — architectural decisions and tradeoff discussions before writing code
+- 🔍 **Code reviewer** — catching issues, suggesting improvements, explaining behaviors
+- 🎯 **Scope manager** — calling out scope creep and keeping the project grounded
+- 💡 **Idea validator** — pressure-testing approaches before committing to them
+- 📝 **Documentation collaborator** — the thinking and substance is the author's; the shaping and polish was Claude's
 
-During the build, Claude served as a design partner for architectural decisions, an idea reviewer for validating approaches before committing to them, a scope reflector for keeping the project grounded when ambition outpaced resources, a code reviewer for catching issues and suggesting improvements, and a project manager for calling out scope creep before it derailed progress. This documentation was also written collaboratively — the thinking and substance is the author's, the shaping and polish was Claude's.
+**Ground rule throughout:** Claude was explicitly instructed to guide and review rather than implement. Understanding checks were built into the process — every piece of code was owned and explainable, not just functional.
 
-A deliberate ground rule throughout: Claude was instructed to guide and review rather than implement. Understanding checks were a regular part of the process, ensuring that every piece of code written was owned and explainable, not just functional. The ratio of human to AI written code skews heavily toward the author — and more importantly, the understanding behind it is entirely theirs.
+**In the running application, Claude is the runtime:**
+- Natural language → SQL generation via the Anthropic API
+- LLM-as-a-Judge evaluation layer
+- Autonomous discoveries DAG
 
-In the running application, Claude plays a different role entirely — it is the runtime engine. The Anthropic API powers the natural language to SQL generation, the judge evaluation layer, and the autonomous discoveries DAG. Claude as a build tool and Claude as a production component are two distinct relationships, and DJ Data is a firsthand demonstration of both.
+> Claude as a build tool and Claude as a production component are two distinct relationships. DJ Data demonstrates both.
 
 </details>
 
