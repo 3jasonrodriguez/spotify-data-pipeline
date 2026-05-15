@@ -162,7 +162,7 @@ A dedicated service account with two least-privilege policies — no console acc
 **`SpotifyDataPipelineS3RWDev`** — scoped to a single bucket:
 ```
 s3:ListBucket · s3:GetObject · s3:PutObject · s3:GetBucketLocation
-Resource: arn:aws:s3:::spotify-pipe-raw-793001767690
+Resource: arn:aws:s3:::<your-bucket-name>
 ```
 
 **`SpotifyPipelineAthenaDev`** — query execution and catalog reads only:
