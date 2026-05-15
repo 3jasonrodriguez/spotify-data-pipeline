@@ -11,6 +11,7 @@
 
 - [Overview](#overview)
 - [Architecture](#architecture)
+- [Security](#security)
 - [Feature Walkthrough](#feature-walkthrough)
 - [Evolution of the Project](#evolution-of-the-project)
 - [Technical Deep Dives](#technical-deep-dives)
@@ -147,6 +148,43 @@ Everything runs on one instance — Postgres, Streamlit, the MCP server, and Air
 
 ---
 
+## Security
+
+Access is locked down at two layers — AWS IAM for cloud resources, and a dedicated readonly Postgres user for the agentic layer.
+
+<details>
+<summary>Dive deeper</summary>
+
+#### AWS IAM — `spotify-data-pipeline-svc`
+
+A dedicated service account with two least-privilege policies — no console access, no wildcard permissions.
+
+**`SpotifyDataPipelineS3RWDev`** — scoped to a single bucket:
+```
+s3:ListBucket · s3:GetObject · s3:PutObject · s3:GetBucketLocation
+Resource: arn:aws:s3:::spotify-pipe-raw-793001767690
+```
+
+**`SpotifyPipelineAthenaDev`** — query execution and catalog reads only:
+```
+athena:StartQueryExecution · GetQueryExecution · GetQueryResults · StopQueryExecution
+glue:GetDatabase · GetTable · GetPartitions
+```
+
+No S3 delete permissions. No Athena DDL. No Glue write access. The service account can read, write, and query — nothing more.
+
+---
+
+#### PostgreSQL — `spotify_readonly`
+
+A dedicated readonly Postgres user was created exclusively for the agentic layer. It has `SELECT`-only grants on the user schemas — no `INSERT`, `UPDATE`, `DELETE`, or DDL of any kind.
+
+This ensures that even if the LLM generates destructive SQL, the database user cannot execute it — a second line of defense independent of the regex safety gate in `execute_sql`.
+
+</details>
+
+---
+
 ## Feature Walkthrough
 
 ### Visualizations
@@ -193,6 +231,13 @@ The DJ Data page is the agentic analytics layer — a natural language interface
 - **Confidence-aware output** — failed eval verdicts surface gracefully with an invitation to rephrase
 - **Out-of-scope handling** — questions outside the database are declined, not hallucinated
 
+**`ask()` — Input / Output**
+
+| | |
+|---|---|
+| **Input** | `question` · `user_scope` |
+| **Output** | `raw_data` · `natural_language_response` · `chart_spec` · `generated_sql` · `verdict` · `response_type` |
+
 </details>
 
 ---
@@ -212,6 +257,13 @@ The Discoveries page is the most agentic part of the project — unprompted, exp
 - **Past discoveries archive** — full history below the latest, click any to open in a popover
 - **Explore Further** — auto-populates the DJ Data chat page with the correct scope and follow-up question, handing off seamlessly to the ask flow
 - **Judge-filtered** — only discoveries that pass the evaluation layer reach the page
+
+**`discover()` — Input / Output**
+
+| | |
+|---|---|
+| **Input** | `user_scope` |
+| **Output** | `insight_text` · `follow_up_question` · `chart_spec` · `user_scope` |
 
 </details>
 
