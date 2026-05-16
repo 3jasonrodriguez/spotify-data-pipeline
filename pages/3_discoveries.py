@@ -76,6 +76,7 @@ def app():
                             if st.button(f"💡 Explore further", key=f"explore_{scope}"):
                                 st.session_state.current_question = row["follow_up_question"]
                                 st.session_state.trigger_ask = True
+                                st.session_state.discovery_scope = row["user_scope"]  # add this
                                 st.switch_page("pages/2_dj_data.py")
                     else:
                         with st.container(border=True):
@@ -93,6 +94,7 @@ def app():
                     if st.button("💡 Explore further", key="explore_compare"):
                         st.session_state.current_question = row["follow_up_question"]
                         st.session_state.trigger_ask = True
+                        st.session_state.discovery_scope = row["user_scope"]  # add this
                         st.switch_page("pages/2_dj_data.py")
             else:
                 with st.container(border=True):

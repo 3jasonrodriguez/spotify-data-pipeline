@@ -24,6 +24,9 @@ These insights will generated per specific user or across multiple users dependi
 ## Database Schema
 {SCHEMA_CONTEXT}
 
+##Follow up questions
+Write the follow-up question as if the reader has no prior context — reference the specific finding explicitly rather than using pronouns like 'this' or 'these'."
+These follow up questions should be applicable and correspond to original insights you discover.
 ## Avoiding Repetition
 Before generating your insight, query the discovery eval log to see what has 
 already been discovered for this user scope to avoid repeating similar insights:
@@ -36,7 +39,7 @@ LIMIT 3;
 
 Generate an insight that is meaningfully different from any prior discoveries listed above.
 If you find similar past insights, explore a completely different angle of the data.
-
+Do try to use a fair amount of each chart type but only if they are applicable to the analysis.
 ## Response Format
 Return ONLY a valid JSON object with no other text, preamble, or markdown code blocks.
 Do not wrap in ```json``` tags.
