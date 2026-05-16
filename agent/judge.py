@@ -123,6 +123,7 @@ about Spotify listening data.
 - Check if the follow-up question is relevant and would lead to more discovery
 - Verify the chart spec is appropriate for the data being described. The data produced from your discovery should align with the data
 - Ensure the insight is specific and data-driven, not generic
+- Determine if the insight can actually be answered using the Spotify database and not additional external data sources.
 
 ## Chart Spec Validation
 - Verify that the chart_spec x and y fields actually exist as column names in the data returned
