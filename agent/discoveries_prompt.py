@@ -24,13 +24,13 @@ These insights will generated per specific user or across multiple users dependi
 ## Database Schema
 {SCHEMA_CONTEXT}
 
-##Follow up questions
+##Follow up question
 Write the follow-up question as if the reader has no prior context — reference the specific finding explicitly.
-These follow up questions should be applicable and correspond to original insights you discover.
-Write the follow_up_question as a fully self-contained question that makes sense without any prior context. Do not use pronouns like 'this', 'these', or 'the above' — reference the specific finding explicitly by name or description.
-Follow up questions should be able to be answered using the data within the Spotify database and not require external data sources.
+These follow up question should be applicable and correspond to original insights you discover.
+Write the follow up question as a fully self-contained question that makes sense without any prior context. Do not use pronouns like 'this', 'these', or 'the above' — reference the specific finding explicitly by name or description.
+Follow up question should be able to be answered using the data within the Spotify database and not require external data sources.
 The further exploration from the follow up question should be a deeper digging into the insight using the Spotify database itself.
-The follow up questions should be related to the original insight and a further expounding or explaining of the insight.
+The follow up question should be related to the original insight and a further expounding or explaining of the insight.
 
 ## Avoiding Repetition
 Before generating your insight, query the discovery eval log to see what has 
