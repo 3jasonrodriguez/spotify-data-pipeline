@@ -39,7 +39,7 @@ containing personal Spotify listening history for multiple users' data.
 {SCHEMA_CONTEXT}
 
 ## Response Format
-Always respond with two parts:
+Always respond with three parts:
 1. A natural language explanation of your findings
 ## Response Length
 Keep your natural language response concise — maximum 5 sentences.

@@ -127,7 +127,6 @@ def ask(question: str, user_scope: str) -> dict:
                     chart_spec = parse_json_response(match.group(1))
                     # validate chart spec columns match raw data
                     if chart_spec and query_result:
-                        import json
                         raw_data = json.loads(query_result)
                         if raw_data:
                             actual_columns = list(raw_data[0].keys())
@@ -157,6 +156,7 @@ def discover(user_scope: str) -> dict:
         insight_text = None
         follow_up_question = None
         chart_spec = None
+        query_result = None 
         messages = [{
             "role": "user",
             "content": f"Generate one interesting insight about the Spotify data for scope: {user_scope}"
@@ -190,15 +190,20 @@ def discover(user_scope: str) -> dict:
                 insight_text = parsed.get("insight_text")
                 follow_up_question = parsed.get("follow_up_question")
                 chart_spec = parsed.get("chart_spec")
-                
                 logger.info(f"Discovery generated for {user_scope}: {insight_text[:100] if insight_text else 'None'}...")
                 
                 # chart spec validation
                 if chart_spec and query_result:
-                    ...
-                    logger.info(f"Chart spec valid: {chart_spec.get('chart_type')} x={chart_spec.get('x')} y={chart_spec.get('y')}")
-                
-                verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec, user_scope)
+                        raw_data = json.loads(query_result)
+                        if raw_data:
+                            actual_columns = list(raw_data[0].keys())
+                            x_col = chart_spec.get('x')
+                            y_col = chart_spec.get('y')
+                            if x_col not in actual_columns or y_col not in actual_columns:
+                                logger.warning(f"Chart spec mismatch — x:{x_col} y:{y_col} not in {actual_columns}")
+                                #discard invalid chart spec
+                                chart_spec = None  
+                verdict = evaluate_discovery(insight_text, follow_up_question, chart_spec, user_scope, query_result)
                 logger.info(f"Judge verdict for {user_scope}: passed={verdict.get('passed')} score={verdict.get('score')}")
                 
                 if verdict.get("passed"):
@@ -209,5 +214,5 @@ def discover(user_scope: str) -> dict:
                 break
     except Exception as e:
         logger.error(f"Error in discover() for {user_scope}: {e}")
-        return {"insight_text": None, "follow_up_question": None, "chart_spec": None, "user_scope": None}
-    return {"insight_text": insight_text, "follow_up_question": follow_up_question, "chart_spec": chart_spec, "user_scope":user_scope}
+        return {"insight_text": None, "follow_up_question": None, "chart_spec": None, "user_scope": None, "raw_data": None}
+    return {"insight_text": insight_text, "follow_up_question": follow_up_question, "chart_spec": chart_spec, "user_scope":user_scope, "query_result":query_result}

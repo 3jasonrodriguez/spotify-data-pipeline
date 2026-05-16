@@ -177,7 +177,7 @@ def discovery_eval_log(insight_text: str, follow_up_question: str, user_scope: s
         logger.error(f"Error in evaluate(): {e}")
 
 #Judge whether a discovery meets the criteria, is valid, and interesting
-def evaluate_discovery(insight_text: str, follow_up_question: str, chart_spec: dict, user_scope: str) -> dict:
+def evaluate_discovery(insight_text: str, follow_up_question: str, chart_spec: dict, user_scope: str, query_result: str) -> dict:
     try:
         messages = [{
             "role": "user",
@@ -186,6 +186,7 @@ def evaluate_discovery(insight_text: str, follow_up_question: str, chart_spec: d
             Insight Text: {insight_text}
             Follow up question: {follow_up_question}
             Chart Spec: {chart_spec}
+            Query result: {query_result}
             Return your verdict as JSON only, no other text.
             """
         }]

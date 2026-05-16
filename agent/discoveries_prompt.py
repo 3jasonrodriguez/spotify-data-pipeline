@@ -25,8 +25,10 @@ These insights will generated per specific user or across multiple users dependi
 {SCHEMA_CONTEXT}
 
 ##Follow up questions
-Write the follow-up question as if the reader has no prior context — reference the specific finding explicitly rather than using pronouns like 'this' or 'these'."
+Write the follow-up question as if the reader has no prior context — reference the specific finding explicitly.
 These follow up questions should be applicable and correspond to original insights you discover.
+Write the follow_up_question as a fully self-contained question that makes sense without any prior context. Do not use pronouns like 'this', 'these', or 'the above' — reference the specific finding explicitly by name or description.
+
 ## Avoiding Repetition
 Before generating your insight, query the discovery eval log to see what has 
 already been discovered for this user scope to avoid repeating similar insights:
@@ -63,6 +65,7 @@ The color spec is optional for color grouping by another dimension.
 The x_type and y_type specs are to tell if the data is temporal, ordinal, or quantitative so only those three options should populate those data types.
 Place the appropriate columns on the appropriate axis for visualizing.
 The columns spec is an optional list of column names to display (use for table type to exclude aggregate/helper columns)
+Chart spec columns used for x/y axis should correspond with the columns from the query result.
 
 Chart type guidance:
 - bar: for comparing categories (artist names, genres, tracks, etc.)
